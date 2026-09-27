@@ -25,7 +25,7 @@ interface TierSetup {
   checked: boolean;
   csvFile: File | null;
   csvRows: CsvRow[] | null;
-  // Editable email overrides — seeded from event, editable per run
+  // Email content for this run — editable before starting
   emailSubject: string;
   emailBody: string;
 }
@@ -49,8 +49,8 @@ function RunPageInner() {
           checked: preselect ? ev.id === preselect : false,
           csvFile: null,
           csvRows: null,
-          emailSubject: ev.email_subject ?? "",
-          emailBody: ev.email_body ?? "",
+          emailSubject: "",
+          emailBody: "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards",
         }))
       );
     });
@@ -83,23 +83,10 @@ function RunPageInner() {
     const jobs: TierJob[] = [];
     try {
       for (const tier of selectedTiers) {
-        // Build an inline event config so the run-time email overrides are used
         const config = {
-          event_config: {
-            name: tier.event.name,
-            template_path: tier.event.template_path,
-            template_natural_width: tier.event.template_natural_width,
-            template_natural_height: tier.event.template_natural_height,
-            text_position_x: tier.event.text_position_x,
-            text_position_y: tier.event.text_position_y,
-            font_path: tier.event.font_path,
-            font_size: tier.event.font_size,
-            font_style: tier.event.font_style,
-            font_color: tier.event.font_color,
-            max_text_width: tier.event.max_text_width,
-            email_subject: tier.emailSubject,
-            email_body: tier.emailBody,
-          },
+          event_id: tier.event.id,
+          email_subject: tier.emailSubject,
+          email_body: tier.emailBody,
           dry_run: dryRun,
           batch_size: batchSize,
           name_col: "name",

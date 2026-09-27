@@ -80,8 +80,9 @@ async def create_job(
             "font_style": event.font_style,
             "font_color": event.font_color,
             "max_text_width": event.max_text_width,
-            "email_subject": event.email_subject,
-            "email_body": event.email_body,
+            # Email always comes from the run-time config, not the event
+            "email_subject": cfg.email_subject,
+            "email_body": cfg.email_body,
         }
         event_name = event.name
     elif cfg.event_config:

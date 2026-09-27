@@ -4,7 +4,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useCallback,
 } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,15 +11,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { uploadTemplate, templateUrl, type Event } from "@/lib/api";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -32,8 +23,6 @@ const schema = z.object({
   font_style: z.string(),
   font_color: z.string(),
   max_text_width: z.coerce.number().min(100),
-  email_subject: z.string().optional(),
-  email_body: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -193,10 +182,6 @@ export function EventForm({ initial, onSave, saving }: Props) {
       font_style: initial?.font_style ?? "normal",
       font_color: initial?.font_color ?? "#000000",
       max_text_width: initial?.max_text_width ?? 1400,
-      email_subject: initial?.email_subject ?? "",
-      email_body:
-        initial?.email_body ??
-        "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards",
     },
   });
 
@@ -211,9 +196,6 @@ export function EventForm({ initial, onSave, saving }: Props) {
   const [posY, setPosY] = useState(initial?.text_position_y ?? 0);
   const [sampleText, setSampleText] = useState("Sample Name");
   const [uploading, setUploading] = useState(false);
-
-  // Active sidebar tab
-  const [tab, setTab] = useState<"text" | "email">("text");
 
   const formValues = watch();
 
@@ -339,29 +321,12 @@ export function EventForm({ initial, onSave, saving }: Props) {
         {/* ── Right: Property sidebar ───────────────────────────────────────── */}
         <div className="w-64 shrink-0 border-l flex flex-col bg-background">
 
-          {/* Tab switcher */}
-          <div className="flex border-b">
-            {(["text", "email"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={`flex-1 py-2.5 text-xs font-medium capitalize transition-colors ${
-                  tab === t
-                    ? "border-b-2 border-primary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t === "text" ? "Text & Style" : "Email"}
-              </button>
-            ))}
+          <div className="px-4 py-2.5 border-b">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Text & Style</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-5">
-
-            {/* ── Text & Style tab ────────────────────────────────────────── */}
-            {tab === "text" && (
-              <>
+            <>
                 {/* Sample text (what shows in canvas preview) */}
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -521,38 +486,7 @@ export function EventForm({ initial, onSave, saving }: Props) {
                     Preview uses system font; actual cert uses uploaded font
                   </p>
                 </div>
-              </>
-            )}
-
-            {/* ── Email tab ───────────────────────────────────────────────── */}
-            {tab === "email" && (
-              <>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Subject
-                  </Label>
-                  <Input
-                    {...register("email_subject")}
-                    placeholder="Your Certificate — Event Name"
-                    className="text-sm h-8"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Body
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Use <code className="bg-muted px-1 rounded">{"{name}"}</code> for first name
-                  </p>
-                  <Textarea
-                    {...register("email_body")}
-                    rows={10}
-                    className="text-sm resize-none"
-                    placeholder={"Hi {name},\n\nPlease find your certificate attached."}
-                  />
-                </div>
-              </>
-            )}
+            </>
           </div>
         </div>
       </div>

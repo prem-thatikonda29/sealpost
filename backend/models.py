@@ -34,10 +34,6 @@ class Event(Base):
     font_color = Column(String, default="#000000", nullable=False)  # CSS hex
     max_text_width = Column(Integer, default=1400, nullable=False)
 
-    # Email
-    email_subject = Column(String, nullable=True)
-    email_body = Column(Text, nullable=True)
-
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     jobs = relationship("Job", back_populates="event")

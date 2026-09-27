@@ -20,8 +20,6 @@ class EventBase(BaseModel):
     font_style: str = "normal"
     font_color: str = "#000000"
     max_text_width: int = 1400
-    email_subject: Optional[str] = None
-    email_body: Optional[str] = None
 
 
 class EventCreate(EventBase):
@@ -68,6 +66,9 @@ class JobCreate(BaseModel):
     batch_size: int = 0                      # 0 = no limit
     name_col: str = "name"
     email_col: str = "email"
+    # Email content is always supplied at run time
+    email_subject: str = "Your Certificate"
+    email_body: str = "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards"
 
 
 class JobResponse(BaseModel):

@@ -88,7 +88,6 @@ export default function EventsPage() {
               <div className="text-xs text-muted-foreground space-y-0.5">
                 <p>Font: {ev.font_size}px · {ev.font_style} · {ev.font_color}</p>
                 <p>Max width: {ev.max_text_width}px</p>
-                {ev.email_subject && <p>Subject: {ev.email_subject}</p>}
               </div>
               <div className="flex gap-2 mt-4">
                 <Link href={`/events/${ev.id}`}>

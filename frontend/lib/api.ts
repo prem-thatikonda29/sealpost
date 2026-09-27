@@ -20,8 +20,6 @@ export interface Event {
   font_style: string;
   font_color: string;
   max_text_width: number;
-  email_subject?: string;
-  email_body?: string;
   created_at: string;
 }
 
