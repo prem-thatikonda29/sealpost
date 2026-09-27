@@ -87,8 +87,9 @@ export const uploadTemplate = (file: File) => {
 
 export const templateUrl = (path: string) => {
   // path stored in DB is e.g. "uploads/<uuid>_filename.jpg"
-  // extract uuid prefix
-  const id = path.split("/").pop()?.split("_")[0] ?? "";
+  // UUID is exactly 36 chars (8-4-4-4-12 with hyphens) — extract by fixed length
+  const filename = path.split("/").pop() ?? "";
+  const id = filename.length >= 36 ? filename.slice(0, 36) : filename;
   return `${BASE}/api/templates/${id}`;
 };
 

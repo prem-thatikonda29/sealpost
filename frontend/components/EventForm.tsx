@@ -63,36 +63,32 @@ function CertCanvas({
   onPositionChange,
 }: OverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [displaySize, setDisplaySize] = useState({ w: 0, h: 0 });
 
-  // Track rendered size of the container
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      setDisplaySize({ w: el.clientWidth, h: el.clientHeight });
-    });
-    ro.observe(el);
-    setDisplaySize({ w: el.clientWidth, h: el.clientHeight });
-    return () => ro.disconnect();
-  }, [templateUrl]);
-
-  const scale = naturalWidth > 0 ? displaySize.w / naturalWidth : 1;
-  const displayH = naturalHeight * scale;
-
-  // Click on canvas → compute original-space coords and call back
+  // Click on canvas → compute original-space coords
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!naturalWidth || !naturalHeight) return;
     const rect = e.currentTarget.getBoundingClientRect();
+    const scale = rect.width / naturalWidth;
     const ox = Math.round((e.clientX - rect.left) / scale);
     const oy = Math.round((e.clientY - rect.top) / scale);
     onPositionChange(ox, oy);
   };
 
-  // Text position in display pixels
+  // For text overlay we need a reactive scale — track container width via state
+  const [containerW, setContainerW] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setContainerW(el.getBoundingClientRect().width));
+    ro.observe(el);
+    setContainerW(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+
+  const scale = naturalWidth > 0 && containerW > 0 ? containerW / naturalWidth : 0;
   const textDisplayX = posX * scale;
   const textDisplayY = posY * scale;
-  const displayFontSize = fontSize * scale;
+  const displayFontSize = Math.max(fontSize * scale, 8);
 
   const isBold = fontStyle === "bold" || fontStyle === "bold_italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold_italic";
@@ -101,10 +97,14 @@ function CertCanvas({
     <div
       ref={containerRef}
       className="relative w-full cursor-crosshair select-none overflow-hidden rounded-lg"
-      style={{ height: displayH > 0 ? displayH : "auto" }}
+      style={
+        naturalWidth && naturalHeight
+          ? { aspectRatio: `${naturalWidth} / ${naturalHeight}` }
+          : { minHeight: 320 }
+      }
       onClick={handleClick}
     >
-      {/* Template image — fills container exactly */}
+      {/* Template image — normal flow, sizes the container via aspect-ratio */}
       {templateUrl ? (
         <img
           src={templateUrl}
@@ -118,8 +118,8 @@ function CertCanvas({
         </div>
       )}
 
-      {/* Live text overlay — CSS rendered, instant */}
-      {posX > 0 && posY > 0 && templateUrl && (
+      {/* Live text overlay — only render once we have a valid scale */}
+      {posX > 0 && posY > 0 && templateUrl && scale > 0 && (
         <div
           className="absolute pointer-events-none"
           style={{
@@ -133,7 +133,6 @@ function CertCanvas({
             fontFamily: fontFamily || "system-ui, sans-serif",
             whiteSpace: "nowrap",
             lineHeight: 1.2,
-            // Subtle text shadow so text is visible on any background
             textShadow: "0 0 4px rgba(0,0,0,0.15)",
           }}
         >
