@@ -56,6 +56,39 @@ def send_email(smtp: smtplib.SMTP, name: str, email: str, pdf_path: str, tier: d
     smtp.sendmail(GMAIL_USER, [email] + CC_ADDRESSES, msg.as_string())
 
 
+def run_tier_dry_run(tier_name: str, tier: dict, sent: set[str]) -> tuple[int, int, int]:
+    """Dry run: validate CSV and PDFs without sending."""
+    with open(tier["csv"], newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+
+    ok = skip = fail = 0
+    for i, row in enumerate(rows, 1):
+        name = row.get("name", "").strip()
+        email = row.get("email", "").strip()
+
+        if not name or not email:
+            print(f"[{tier_name.upper()}] SKIP row {i}: missing name or email")
+            skip += 1
+            continue
+
+        if email in sent:
+            print(f"[{tier_name.upper()}] SKIP {name} <{email}>: already sent")
+            skip += 1
+            continue
+
+        pdf_path = os.path.join(tier["output_dir"], f"{sanitize_name(name)}_{tier['cert_suffix']}.pdf")
+        if not os.path.exists(pdf_path):
+            print(f"[{tier_name.upper()}] WARN {name}: PDF not found at {pdf_path}")
+            skip += 1
+            continue
+
+        print(f"[{tier_name.upper()}] OK   {name} <{email}> — would send {pdf_path}")
+        ok += 1
+
+    print(f"[{tier_name.upper()}] Dry run complete: {ok} ready to send, {skip} skipped.\n")
+    return ok, skip, fail
+
+
 def run_tier(smtp: smtplib.SMTP, tier_name: str, tier: dict, sent: set[str]) -> tuple[int, int, int]:
     with open(tier["csv"], newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
@@ -101,10 +134,25 @@ def main() -> None:
         raise SystemExit("Error: GMAIL_USER and GMAIL_APP_PASSWORD must be set in .env")
 
     selected = sys.argv[1] if len(sys.argv) > 1 else None
+    dry_run = False
+    if selected and selected.startswith("--"):
+        dry_run = selected == "--dry-run"
+        selected = None
+    elif len(sys.argv) > 2 and sys.argv[2] == "--dry-run":
+        dry_run = True
+
     if selected and selected not in TIERS:
         raise SystemExit(f"Unknown tier '{selected}'. Choose from: {', '.join(TIERS)}")
 
     sent = load_sent()
+
+    if dry_run:
+        print("DRY RUN — will not send emails\n")
+        for tier_name, tier in TIERS.items():
+            if selected and tier_name != selected:
+                continue
+            run_tier_dry_run(tier_name, tier, sent)
+        return
 
     print("Connecting to SMTP…")
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
