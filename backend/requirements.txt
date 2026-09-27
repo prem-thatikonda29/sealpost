@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pillow
+img2pdf
+python-dotenv
+aiofiles
+sse-starlette
+dnspython

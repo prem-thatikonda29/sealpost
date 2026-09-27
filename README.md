@@ -1,178 +1,105 @@
-# Certificates Sending Application
+# Cert Sender
 
-Generate and email personalized PDF certificates for hackathon participants via Gmail SMTP.
+Browser-based certificate generation and email sending tool. Upload templates, position names visually, upload participant CSVs, and send certificates with real-time progress — no terminal required.
 
 ## Features
 
-- Generates PDF certificates by overlaying names onto image templates
-- Frosted-glass "pill" effect with blur, tint, border, and highlight
-- Auto-shrinks font to fit long names on a single line
-- Emails certificates with tier-specific subject lines and body copy
-- Resumable — tracks progress in `progress.json`, skips already-sent emails
-- Batch mode for sending in controlled chunks
-- Dry-run mode to generate without sending
-- Configurable SMTP provider (Gmail by default)
+- **Visual name positioning** — click on the template in-browser to set the exact center point; see a live preview instantly
+- **Email pre-validation** — DNS MX check before sending catches bad domains (typos like `@gmial.com`) before a single email goes out
+- **Bounce detection** — after sending, polls your Gmail inbox for NDR bounce emails and updates row statuses automatically
+- **Job history** — every run is recorded with per-row status (sent / failed / invalid domain / bounced), exportable as CSV
+- **Saved events** — reusable certificate configurations per event/tier
 
-## Project Structure
+## Prerequisites
 
-```
-cert-sender/
-├── config.py                 # All tunable values (tiers, fonts, SMTP, email copy)
-├── run.py                    # Combined generate + send (main entry point)
-├── generate_certs.py         # Generate only
-├── send_certs.py             # Send only
-├── find_position.py          # GUI helper to find text position on template
-├── data/                     # CSV files (one per tier, columns: name, email)
-├── templates/                # Certificate template images
-├── fonts/                    # Font files
-├── tests/                    # Test suite
-├── output/                   # Generated PDFs (gitignored)
-├── sent_log.csv              # Delivery tracking (gitignored)
-├── progress.json             # Resume cursor (gitignored)
-└── .env                      # Credentials (gitignored)
-```
-
-## Requirements
-
-- Python 3.10+
-- A Gmail account with an [App Password](https://support.google.com/accounts/answer/185833)
+- Python 3.11+
+- Node.js 20+
 
 ## Setup
 
+### 1. Clone and configure
+
 ```bash
-# Clone the repo
-git clone https://github.com/prem-thatikonda29/Certificates-Sender.git
-cd Certificates-Sender
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create your .env
+git clone <repo-url>
+cd cert-sender
 cp .env.example .env
-# Edit .env with your Gmail credentials (see below)
 ```
 
-### .env
-
+Edit `.env`:
 ```
-GMAIL_USER=you@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+GMAIL_USER=your@gmail.com
+GMAIL_APP_PASSWORD=your_16_char_app_password
 ```
 
-See `.env.example` for step-by-step instructions on generating an App Password.
+> Gmail App Password: Google Account → Security → 2-Step Verification → App passwords
 
-## Usage
+### 2. Backend
 
 ```bash
-# Generate + send all tiers
-python run.py
-
-# Single tier
-python run.py winner
-
-# Generate only (no email)
-python run.py --dry-run
-
-# Send in batches of 10
-python run.py --batch=10
-
-# Generate certificates only (no email logic)
-python generate_certs.py
-
-# Send only (PDFs must already exist)
-python send_certs.py
+pip install -r backend/requirements.txt
 ```
 
-### CLI Arguments
-
-| Argument | Description |
-|----------|-------------|
-| `<tier>` | Run a single tier (e.g. `winner`, `participants`) |
-| `--dry-run` | Generate PDFs only, skip sending |
-| `--batch=N` | Send N emails per tier, then stop (re-run to continue) |
-
-## Configuration
-
-All tunable values live in `config.py`:
-
-```python
-# SMTP settings (Gmail default, change for other providers)
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
-
-# Font settings
-FONT_PATH = "fonts/PressStart2P-Regular.ttf"
-FONT_COLOR = (255, 255, 255)  # RGB white
-
-# Frosted-glass pill effect
-PILL_COLOR = (15, 15, 15, 140)  # RGBA dark tint
-PILL_PADDING_X = 84
-PILL_PADDING_Y = 42
-
-# Email addresses copied on every certificate email
-CC_ADDRESSES = ["organizer@example.com"]
-```
-
-### Tiers
-
-Each tier maps a CSV + template to an output directory and email. See `config.py` for the full structure with inline docs.
-
-```python
-TIERS = {
-    "winner": {
-        "csv": "data/winner.csv",
-        "template": "templates/winner_template.jpg",
-        "output_dir": "output/winner",
-        "cert_suffix": "winner_certificate",
-        "text_position": (1263, 675),  # (x, y) center of name placement
-        "font_size": 66,
-        "max_text_width": 1740,
-        "email_subject": "Congratulations — You won!",
-        "email_body": "Hi {name},\n\n...",
-    },
-    # Add more tiers here...
-}
-```
-
-### Finding Text Coordinates
-
-Use `find_position.py` to find the pixel coordinates for name placement on your template:
+### 3. Frontend
 
 ```bash
-python find_position.py templates/winner_template.jpg
+cd frontend && npm install && cd ..
 ```
 
-A GUI window opens. Click where the name should be centered — coordinates print to the terminal. Update `text_position` in `config.py` with the result.
-
-## How It Works
-
-1. Load the tier's CSV and template image
-2. For each participant, fit the name into the template using an auto-shrinking font
-3. Draw a frosted-glass pill behind the name (blur + dark tint + border + highlight)
-4. Convert to PDF via `img2pdf`
-5. Send via SMTP with the PDF attached
-6. Log result to `sent_log.csv`, update cursor in `progress.json`
-
-## Error Handling
-
-| Scenario | Behavior |
-|----------|----------|
-| Missing name or email in CSV | Skip row, print warning |
-| PDF not found (send mode) | Skip, print warning |
-| SMTP auth failure | Exit immediately |
-| SMTP failure for one email | Log `failed`, continue to next |
-| Script interrupted | Re-run safely; already-sent rows are skipped |
-
-## Testing
+## Running
 
 ```bash
-# Run all tests
-pytest
-
-# Verbose output
-pytest -v
+bash start.sh
 ```
 
-## License
+This starts:
+- **Backend** at `http://localhost:8000` (FastAPI + SQLite)
+- **Frontend** at `http://localhost:3000` (Next.js)
 
-MIT
+Or start separately:
+```bash
+# Terminal 1
+uvicorn backend.main:app --reload
+
+# Terminal 2
+cd frontend && npm run dev
+```
+
+## First-time flow
+
+1. Go to `http://localhost:3000`
+2. **Events → New Event** — fill in name, upload template image, set text position (click on template), set font options, write email subject/body
+3. **Run** — select the event, upload participants CSV, optionally validate emails, start job
+4. Watch live progress — sent / invalid / failed rows update in real time
+5. After ~30s, bounce check runs automatically against your Gmail inbox
+6. **History** — view any past job, see per-row status, export CSV
+
+## Runtime directories
+
+These are created automatically on first run and are gitignored:
+
+| Path | Contents |
+|---|---|
+| `uploads/` | Uploaded template images and font files |
+| `output/` | Generated certificate PDFs (per job) |
+| `data.db` | SQLite database (events, jobs, rows) |
+
+## API
+
+The FastAPI backend exposes a full REST API. Swagger docs available at:
+```
+http://localhost:8000/docs
+```
+
+Useful for coding agents or scripted automation:
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/events` | List all saved events |
+| `POST /api/events` | Create event |
+| `PUT /api/events/{id}` | Update event |
+| `POST /api/templates/upload` | Upload a template image |
+| `POST /api/preview` | Render sample certificate → PNG |
+| `POST /api/jobs` | Start a job (multipart: config JSON + CSV file) |
+| `GET /api/jobs/{id}/progress` | SSE stream of real-time row progress |
+| `GET /api/jobs` | List all past jobs |
+| `POST /api/jobs/validate-emails` | Validate email domains before sending |
