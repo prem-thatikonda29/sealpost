@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -16,16 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { PositionEditor } from "@/components/PositionEditor";
-import { CertPreview } from "@/components/CertPreview";
 import { uploadTemplate, templateUrl, type Event } from "@/lib/api";
+
+// ─── Schema ───────────────────────────────────────────────────────────────────
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -46,6 +44,139 @@ interface Props {
   saving?: boolean;
 }
 
+// ─── Canvas overlay text renderer ─────────────────────────────────────────────
+
+interface OverlayProps {
+  templateUrl: string;
+  naturalWidth: number;
+  naturalHeight: number;
+  posX: number;
+  posY: number;
+  fontSize: number;
+  fontStyle: string;
+  fontColor: string;
+  fontFamily: string;
+  sampleText: string;
+  onPositionChange: (x: number, y: number) => void;
+}
+
+function CertCanvas({
+  templateUrl,
+  naturalWidth,
+  naturalHeight,
+  posX,
+  posY,
+  fontSize,
+  fontStyle,
+  fontColor,
+  fontFamily,
+  sampleText,
+  onPositionChange,
+}: OverlayProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [displaySize, setDisplaySize] = useState({ w: 0, h: 0 });
+
+  // Track rendered size of the container
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setDisplaySize({ w: el.clientWidth, h: el.clientHeight });
+    });
+    ro.observe(el);
+    setDisplaySize({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, [templateUrl]);
+
+  const scale = naturalWidth > 0 ? displaySize.w / naturalWidth : 1;
+  const displayH = naturalHeight * scale;
+
+  // Click on canvas → compute original-space coords and call back
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!naturalWidth || !naturalHeight) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ox = Math.round((e.clientX - rect.left) / scale);
+    const oy = Math.round((e.clientY - rect.top) / scale);
+    onPositionChange(ox, oy);
+  };
+
+  // Text position in display pixels
+  const textDisplayX = posX * scale;
+  const textDisplayY = posY * scale;
+  const displayFontSize = fontSize * scale;
+
+  const isBold = fontStyle === "bold" || fontStyle === "bold_italic";
+  const isItalic = fontStyle === "italic" || fontStyle === "bold_italic";
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full cursor-crosshair select-none overflow-hidden rounded-lg"
+      style={{ height: displayH > 0 ? displayH : "auto" }}
+      onClick={handleClick}
+    >
+      {/* Template image — fills container exactly */}
+      {templateUrl ? (
+        <img
+          src={templateUrl}
+          alt="Certificate template"
+          className="absolute inset-0 w-full h-full object-fill pointer-events-none"
+          draggable={false}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/40 border-2 border-dashed border-muted-foreground/30 rounded-lg">
+          <p className="text-muted-foreground text-sm">Upload a template to begin</p>
+        </div>
+      )}
+
+      {/* Live text overlay — CSS rendered, instant */}
+      {posX > 0 && posY > 0 && templateUrl && (
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: textDisplayX,
+            top: textDisplayY,
+            transform: "translate(-50%, -50%)",
+            fontSize: displayFontSize,
+            fontWeight: isBold ? 700 : 400,
+            fontStyle: isItalic ? "italic" : "normal",
+            color: fontColor,
+            fontFamily: fontFamily || "system-ui, sans-serif",
+            whiteSpace: "nowrap",
+            lineHeight: 1.2,
+            // Subtle text shadow so text is visible on any background
+            textShadow: "0 0 4px rgba(0,0,0,0.15)",
+          }}
+        >
+          {sampleText || "Sample Name"}
+        </div>
+      )}
+
+      {/* Crosshair dot at position */}
+      {posX > 0 && posY > 0 && templateUrl && (
+        <div
+          className="absolute pointer-events-none"
+          style={{ left: textDisplayX, top: textDisplayY }}
+        >
+          <div className="absolute bg-white/80 border border-primary rounded-full"
+            style={{ width: 8, height: 8, transform: "translate(-50%, -50%)" }} />
+        </div>
+      )}
+
+      {/* Click hint when no position set */}
+      {(!posX || !posY) && templateUrl && (
+        <div className="absolute inset-0 flex items-end justify-center pb-4 pointer-events-none">
+          <span className="bg-black/50 text-white text-xs px-3 py-1 rounded-full">
+            Click to place text
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main EventForm ────────────────────────────────────────────────────────────
+
 export function EventForm({ initial, onSave, saving }: Props) {
   const {
     register,
@@ -63,7 +194,9 @@ export function EventForm({ initial, onSave, saving }: Props) {
       font_color: initial?.font_color ?? "#000000",
       max_text_width: initial?.max_text_width ?? 1400,
       email_subject: initial?.email_subject ?? "",
-      email_body: initial?.email_body ?? "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards",
+      email_body:
+        initial?.email_body ??
+        "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards",
     },
   });
 
@@ -76,10 +209,11 @@ export function EventForm({ initial, onSave, saving }: Props) {
   const [fontPath, setFontPath] = useState(initial?.font_path ?? "");
   const [posX, setPosX] = useState(initial?.text_position_x ?? 0);
   const [posY, setPosY] = useState(initial?.text_position_y ?? 0);
-  const [posDialogOpen, setPosDialogOpen] = useState(false);
-  const [draftPosX, setDraftPosX] = useState(posX);
-  const [draftPosY, setDraftPosY] = useState(posY);
+  const [sampleText, setSampleText] = useState("Sample Name");
   const [uploading, setUploading] = useState(false);
+
+  // Active sidebar tab
+  const [tab, setTab] = useState<"text" | "email">("text");
 
   const formValues = watch();
 
@@ -89,13 +223,13 @@ export function EventForm({ initial, onSave, saving }: Props) {
     setUploading(true);
     try {
       const res = await uploadTemplate(file);
-      setTemplatePath(res.url.replace("/api/templates/", `uploads/${res.template_id}_${file.name}`));
-      // Store the actual uploads/ path for backend use
-      // The backend serves it at /api/templates/<id> but stores to uploads/<id>_<filename>
       setTemplatePath(`uploads/${res.template_id}_${file.name}`);
       setTemplateNW(res.natural_width);
       setTemplateNH(res.natural_height);
       setTemplateDisplayUrl(res.url);
+      // Reset position when template changes
+      setPosX(0);
+      setPosY(0);
     } finally {
       setUploading(false);
     }
@@ -104,7 +238,6 @@ export function EventForm({ initial, onSave, saving }: Props) {
   const handleFontUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Upload font file as a "template" upload (same endpoint, different use)
     setUploading(true);
     try {
       const res = await uploadTemplate(file);
@@ -126,227 +259,303 @@ export function EventForm({ initial, onSave, saving }: Props) {
     });
   };
 
-  const previewParams = {
-    template_path: templatePath,
-    text_position_x: posX,
-    text_position_y: posY,
-    font_path: fontPath || undefined,
-    font_size: formValues.font_size,
-    font_style: formValues.font_style,
-    font_color: formValues.font_color,
-    max_text_width: formValues.max_text_width,
-  };
-
+  // ── Layout: full-width canvas + fixed right sidebar ──────────────────────────
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Basic info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Event Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Event Name *</Label>
-            <Input {...register("name")} placeholder="e.g. Hackathon 2025 Winners" />
-            {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
-          </div>
-          <div className="space-y-1.5">
-            <Label>Description</Label>
-            <Input {...register("description")} placeholder="Optional notes" />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Template */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Certificate Template</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Template Image (JPG / PNG)</Label>
+    <form onSubmit={handleSubmit(onSubmit)}>
+      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-4 mb-4 px-1">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="min-w-0">
             <Input
-              type="file"
-              accept="image/jpeg,image/png,image/jpg"
-              onChange={handleTemplateUpload}
-              disabled={uploading}
+              {...register("name")}
+              placeholder="Event name"
+              className="text-base font-medium border-0 shadow-none px-0 focus-visible:ring-0 bg-transparent"
             />
-            {templateDisplayUrl && (
-              <img
-                src={templateDisplayUrl}
-                alt="Template preview"
-                className="mt-2 rounded border max-h-40 object-contain"
-              />
+            {errors.name && (
+              <p className="text-destructive text-xs">{errors.name.message}</p>
             )}
           </div>
+          <Input
+            {...register("description")}
+            placeholder="Description (optional)"
+            className="text-sm border-0 shadow-none px-0 focus-visible:ring-0 bg-transparent text-muted-foreground w-64"
+          />
+        </div>
+        <Button type="submit" disabled={saving || uploading} size="sm">
+          {saving ? "Saving…" : "Save Event"}
+        </Button>
+      </div>
 
-          {/* Name Position */}
-          <div className="space-y-1.5">
-            <Label>Name Position</Label>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
-                {posX > 0 && posY > 0 ? `(${posX}, ${posY})` : "Not set"}
+      {/* ── Main split ──────────────────────────────────────────────────────── */}
+      <div className="flex gap-0 border rounded-xl overflow-hidden bg-muted/20 min-h-[540px]">
+
+        {/* ── Left: Canvas area ─────────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col min-w-0 p-4 gap-3">
+          {/* Template upload row */}
+          <div className="flex items-center gap-3">
+            <label className="cursor-pointer">
+              <span className="inline-flex items-center gap-1.5 text-xs border rounded-md px-3 py-1.5 bg-background hover:bg-muted transition-colors">
+                {uploading ? "Uploading…" : templateDisplayUrl ? "Replace template" : "Upload template"}
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!templateDisplayUrl}
-                onClick={() => {
-                  setDraftPosX(posX);
-                  setDraftPosY(posY);
-                  setPosDialogOpen(true);
-                }}
-              >
-                {posX > 0 ? "Edit Position" : "Set Position"}
-              </Button>
-            </div>
-            {!templateDisplayUrl && (
-              <p className="text-xs text-muted-foreground">Upload a template first</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Text Styling */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Text Styling</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label>Font Size (px)</Label>
-            <Input type="number" {...register("font_size")} min={8} max={300} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Font Style</Label>
-            <Select
-              defaultValue={initial?.font_style ?? "normal"}
-              onValueChange={(v) => setValue("font_style", v ?? "normal")}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="bold">Bold</SelectItem>
-                <SelectItem value="italic">Italic</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Font Color</Label>
-            <div className="flex gap-2 items-center">
               <input
-                type="color"
-                {...register("font_color")}
-                className="w-10 h-9 rounded border cursor-pointer p-0.5"
+                type="file"
+                accept="image/jpeg,image/png,image/jpg"
+                className="hidden"
+                onChange={handleTemplateUpload}
+                disabled={uploading}
               />
-              <Input {...register("font_color")} className="font-mono text-xs" />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Max Text Width (px)</Label>
-            <Input type="number" {...register("max_text_width")} min={100} />
-          </div>
-          <div className="col-span-2 space-y-1.5">
-            <Label>Custom Font File (OTF / TTF) — optional</Label>
-            <Input
-              type="file"
-              accept=".otf,.ttf"
-              onChange={handleFontUpload}
-              disabled={uploading}
-            />
-            {fontPath && (
-              <p className="text-xs text-muted-foreground">
-                Font loaded: {fontPath.split("/").pop()}
-              </p>
+            </label>
+            {templateNW > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {templateNW} × {templateNH}px
+              </span>
+            )}
+            {posX > 0 && posY > 0 && (
+              <span className="text-xs text-muted-foreground ml-auto">
+                Position: ({posX}, {posY})
+              </span>
             )}
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Email */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Email Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Subject</Label>
-            <Input {...register("email_subject")} placeholder="Your Certificate — Event Name" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>
-              Body{" "}
-              <span className="text-muted-foreground font-normal text-xs">
-                — use {"{name}"} for recipient&apos;s first name
-              </span>
-            </Label>
-            <Textarea
-              {...register("email_body")}
-              rows={6}
-              placeholder={"Hi {name},\n\nPlease find your certificate attached."}
-            />
-          </div>
-        </CardContent>
-      </Card>
+          {/* Canvas */}
+          <CertCanvas
+            templateUrl={templateDisplayUrl}
+            naturalWidth={templateNW}
+            naturalHeight={templateNH}
+            posX={posX}
+            posY={posY}
+            fontSize={formValues.font_size}
+            fontStyle={formValues.font_style}
+            fontColor={formValues.font_color}
+            fontFamily="system-ui, sans-serif"
+            sampleText={sampleText}
+            onPositionChange={(x, y) => {
+              setPosX(x);
+              setPosY(y);
+            }}
+          />
+        </div>
 
-      <Button type="submit" disabled={saving || uploading} className="w-full">
-        {saving ? "Saving…" : "Save Event"}
-      </Button>
+        {/* ── Right: Property sidebar ───────────────────────────────────────── */}
+        <div className="w-64 shrink-0 border-l flex flex-col bg-background">
 
-      {/* Position editor dialog */}
-      <Dialog open={posDialogOpen} onOpenChange={setPosDialogOpen}>
-        <DialogContent className="max-w-5xl w-full">
-          <DialogHeader>
-            <DialogTitle>Set Name Position</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">
-                Click on the template to set the centre point of the name text.
-              </p>
-              {templateDisplayUrl && (
-                <PositionEditor
-                  templateUrl={templateDisplayUrl}
-                  naturalWidth={templateNW}
-                  naturalHeight={templateNH}
-                  value={{ x: draftPosX, y: draftPosY }}
-                  onChange={(x, y) => {
-                    setDraftPosX(x);
-                    setDraftPosY(y);
-                  }}
-                />
-              )}
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Live preview</p>
-              <CertPreview
-                params={{
-                  ...previewParams,
-                  text_position_x: draftPosX,
-                  text_position_y: draftPosY,
-                }}
-              />
-            </div>
+          {/* Tab switcher */}
+          <div className="flex border-b">
+            {(["text", "email"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`flex-1 py-2.5 text-xs font-medium capitalize transition-colors ${
+                  tab === t
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t === "text" ? "Text & Style" : "Email"}
+              </button>
+            ))}
           </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setPosDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                setPosX(draftPosX);
-                setPosY(draftPosY);
-                setPosDialogOpen(false);
-              }}
-            >
-              Confirm Position
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+            {/* ── Text & Style tab ────────────────────────────────────────── */}
+            {tab === "text" && (
+              <>
+                {/* Sample text (what shows in canvas preview) */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Preview name
+                  </Label>
+                  <Input
+                    value={sampleText}
+                    onChange={(e) => setSampleText(e.target.value)}
+                    placeholder="Sample Name"
+                    className="text-sm h-8"
+                  />
+                </div>
+
+                <Separator />
+
+                {/* Font size */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Size
+                  </Label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="number"
+                      {...register("font_size")}
+                      min={8}
+                      max={300}
+                      className="h-8 text-sm w-20"
+                    />
+                    <span className="text-xs text-muted-foreground">px</span>
+                    {/* Quick size presets */}
+                    <div className="flex gap-1 ml-auto">
+                      {[24, 36, 48, 64].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setValue("font_size", s)}
+                          className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
+                            formValues.font_size === s
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border hover:bg-muted"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Font style */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Style
+                  </Label>
+                  <div className="flex gap-1.5">
+                    {(["normal", "bold", "italic"] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setValue("font_style", s)}
+                        className={`flex-1 h-8 text-xs border rounded transition-colors capitalize ${
+                          s === "bold" ? "font-bold" : ""
+                        } ${s === "italic" ? "italic" : ""} ${
+                          formValues.font_style === s
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "border-border hover:bg-muted"
+                        }`}
+                      >
+                        {s === "normal" ? "Aa" : s === "bold" ? "B" : "I"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Font color */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Color
+                  </Label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      {...register("font_color")}
+                      className="w-8 h-8 rounded border cursor-pointer p-0.5 shrink-0"
+                    />
+                    <Input
+                      {...register("font_color")}
+                      className="font-mono text-xs h-8 flex-1"
+                      placeholder="#000000"
+                    />
+                  </div>
+                  {/* Preset swatches */}
+                  <div className="flex gap-1.5 flex-wrap pt-1">
+                    {["#000000", "#ffffff", "#1a1a2e", "#c8a96e", "#2c3e50", "#e74c3c"].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setValue("font_color", c)}
+                        className="w-6 h-6 rounded border-2 border-border hover:scale-110 transition-transform"
+                        style={{ backgroundColor: c }}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Max text width */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Max width
+                  </Label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="number"
+                      {...register("max_text_width")}
+                      min={100}
+                      className="h-8 text-sm w-24"
+                    />
+                    <span className="text-xs text-muted-foreground">px</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    Font auto-shrinks if the name exceeds this width
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* Custom font upload */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Custom font
+                  </Label>
+                  <label className="cursor-pointer block">
+                    <span className="inline-flex items-center text-xs border rounded-md px-2.5 py-1.5 bg-background hover:bg-muted transition-colors w-full justify-center">
+                      {fontPath ? fontPath.split("/").pop() : "Upload OTF / TTF"}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".otf,.ttf"
+                      className="hidden"
+                      onChange={handleFontUpload}
+                      disabled={uploading}
+                    />
+                  </label>
+                  {fontPath && (
+                    <button
+                      type="button"
+                      onClick={() => setFontPath("")}
+                      className="text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      Remove custom font
+                    </button>
+                  )}
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    Preview uses system font; actual cert uses uploaded font
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* ── Email tab ───────────────────────────────────────────────── */}
+            {tab === "email" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Subject
+                  </Label>
+                  <Input
+                    {...register("email_subject")}
+                    placeholder="Your Certificate — Event Name"
+                    className="text-sm h-8"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Body
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Use <code className="bg-muted px-1 rounded">{"{name}"}</code> for first name
+                  </p>
+                  <Textarea
+                    {...register("email_body")}
+                    rows={10}
+                    className="text-sm resize-none"
+                    placeholder={"Hi {name},\n\nPlease find your certificate attached."}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </form>
   );
 }
