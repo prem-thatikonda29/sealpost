@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useNotify } from "@/lib/notify";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const notify = useNotify();
 
   const load = async () => {
     setLoading(true);
@@ -26,8 +29,18 @@ export default function EventsPage() {
   }, []);
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete event "${name}"?`)) return;
-    await deleteEvent(id);
+    try {
+      await deleteEvent(id);
+    } catch (e: any) {
+      // Previously this swallowed everything: `confirm` returned true, the
+      // request failed, and the list simply redrew unchanged.
+      notify.error(
+        "Could not delete the event",
+        e?.response?.data?.detail ?? e?.message
+      );
+      return;
+    }
+    notify.success(`Deleted "${name}"`);
     load();
   };
 
@@ -125,14 +138,16 @@ export default function EventsPage() {
                     Run →
                   </Button>
                 </Link>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="ml-auto text-destructive hover:bg-rose hover:text-rose-ink"
-                  onClick={() => handleDelete(ev.id, ev.name)}
+                <ConfirmDialog
+                  triggerClassName="ml-auto text-destructive hover:bg-rose hover:text-rose-ink"
+                  title={`Delete "${ev.name}"?`}
+                  description="The event and its saved template settings are removed. Jobs you have already run and their certificates are not affected."
+                  confirmLabel="Delete event"
+                  busyLabel="Deleting…"
+                  onConfirm={() => handleDelete(ev.id, ev.name)}
                 >
                   Delete
-                </Button>
+                </ConfirmDialog>
               </div>
             </div>
           ))}

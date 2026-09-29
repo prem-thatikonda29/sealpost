@@ -119,9 +119,9 @@ export function FontPicker({
 
       <DialogContent className="flex max-h-[80vh] flex-col gap-0 p-0 sm:max-w-2xl">
         <DialogHeader className="gap-1 border-b border-border p-4 pr-12">
-          <DialogTitle className="font-serif text-lg font-normal tracking-[-0.02em]">
-            Font
-          </DialogTitle>
+          {/* Sans, per the serif boundary: Newsreader is the wordmark and page
+              titles only. A dialog title is UI, not display voice. */}
+          <DialogTitle>Font</DialogTitle>
           <DialogDescription className="text-[13px]">
             {catalog.length} families, loaded from this machine — no network
             needed. Or upload your own.

@@ -165,7 +165,7 @@ Every interactive component ships default / hover / focus-visible / active / dis
 | Dialog | surface, hairline border, 6px radius — the one floating surface allowed to sit rounder than the 4px base. Warm ink scrim at 25%, **no backdrop blur** |
 | Toast | surface, hairline border, 13px title |
 
-### Three components that exist to prevent drift
+### Four components that exist to prevent drift
 
 None is a shadcn primitive; each was added because the app had several duplicated implementations of the same decision.
 
@@ -174,6 +174,13 @@ None is a shadcn primitive; each was added because the app had several duplicate
 | `PageHeader` | The *only* place a serif `<h1>` is constructed. Takes `title`, `subtitle`, `actions`. Every page uses it; no page hand-rolls its own title block |
 | `StatusBadge` | The *only* place a status string becomes a color. Maps `done`/`running`/`pending`/`failed` and `sent`/`invalid_domain`/`bounced`/`skipped` to the status table above. A screen that hand-rolls its own green is a bug |
 | `FontPicker` | The *only* place a font is chosen. Lists every family **rendered in its own face** — the only honest way to pick a typeface — grouped by category, with an upload affordance. Exposes the styles each family can actually render, so the sidebar's Style buttons disable themselves rather than offering a weight the PDF will silently downgrade |
+| `ConfirmDialog` | The *only* place a destructive action is confirmed. Wraps `ui/dialog.tsx`; its confirm button names the action ("Delete event", not "OK"), and it holds open while the work runs so a failure leaves the user somewhere they can retry from |
+
+### Reporting an outcome
+
+`<Toaster />` is mounted once in the root layout, so any screen can report and a toast outlives the navigation a save triggers. Call sites go through `useNotify()` in `lib/notify.ts` rather than touching the toast manager, because two decisions belong in one place: a failure gets 8s where a success gets the 5s default, and a failure is announced with `priority: "high"` so a screen reader says it urgently instead of queueing it politely.
+
+Toasts are for **outcomes of an action that already left the page** — saved, deleted, failed to save. They are not for validation or for errors belonging to a control: a bad `font_path` stays inline next to the picker that produced it, because a message that drifts away from its cause is worse than no message.
 
 ## Layout
 
@@ -204,7 +211,6 @@ Beneath the canvas, a `<details>` disclosure mounts `CertPreview`, which POSTs t
 
 ## Known gaps
 
-- **Deleting an event uses the browser's native `confirm()`.** It is the one unbranded surface left in the app — it ignores the palette, the type, and the radius, and it renders differently on every platform. Wiring `components/ui/dialog.tsx` into the events list is the fix; that component now has a working precedent to copy, since `FontPicker` is built on it.
-- **`components/ui/toast.tsx` and `components/PositionEditor.tsx` are unreferenced.** `toast.tsx` carries the brand treatment and is ready for use. `PositionEditor` is superseded by the inline `CertCanvas` in `EventForm` — one of the two should go.
-- **`tests/` does not run.** All five existing modules import the pre-rewrite CLI (`config`, `generate_certs`, `send_certs`, `run`), none of which exist, so `pytest` errors on collection and collects nothing. `tests/test_fonts.py` is the only current suite and must be run by path: `pytest tests/test_fonts.py`. The rest needs deleting or porting to `backend/`.
 - **An uploaded font can only render its regular face.** The upload route stores one file under a fresh UUID prefix, so nothing can sit beside it for `_load_font`'s sibling probe to find. Uploading `Inter-Bold.ttf` therefore renders bold for *every* style, including normal. Supporting per-style uploads would mean a multi-file upload and a naming scheme that preserves the stem; until then the picker correctly reports one style.
+- **Re-sending a certificate to one person is not possible.** The history page's copy implies it, but no endpoint exists, and a re-send would need to re-render — which today only happens inside a job.
+- **`components/ui/card.tsx` and `label.tsx` are unreferenced.** Every other primitive in `ui/` is imported by at least one screen. `Card` is the one to think about rather than merely delete: the app's grid device is a hairline-separated `div`, not a card, so if it gets used it should be checked against that rule first. `Label` is superseded by the `.label-mono` class, which is what actually encodes the label register.

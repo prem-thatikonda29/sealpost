@@ -6,10 +6,12 @@ import { getEvent, updateEvent, type Event } from "@/lib/api";
 import { EventForm } from "@/components/EventForm";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNotify } from "@/lib/notify";
 
 export default function EditEventPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const notify = useNotify();
   const [event, setEvent] = useState<Event | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -21,10 +23,17 @@ export default function EditEventPage() {
     setSaving(true);
     try {
       await updateEvent(id, data);
-      router.push("/events");
+    } catch (e: any) {
+      notify.error(
+        "Could not save the event",
+        e?.response?.data?.detail ?? e?.message
+      );
+      return;
     } finally {
       setSaving(false);
     }
+    notify.success("Event saved");
+    router.push("/events");
   };
 
   if (!event) {

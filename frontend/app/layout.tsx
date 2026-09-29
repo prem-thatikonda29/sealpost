@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { Toaster } from "@/components/ui/toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,8 +37,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased min-h-screen`}
       >
-        <Nav />
-        <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</main>
+        {/* Mounted at the root so any screen can report an outcome, and so a
+            toast outlives the navigation a save triggers. */}
+        <Toaster>
+          <Nav />
+          <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</main>
+        </Toaster>
       </body>
     </html>
   );
