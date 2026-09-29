@@ -18,8 +18,52 @@ export interface CsvRow {
   email: string;
 }
 
+/**
+ * Which columns the rows came from.
+ *
+ * These have to reach the job, not just this component. The backend re-parses
+ * the uploaded file itself, so a UI that maps "Full Name" while the job is told
+ * to read a column called "name" previews correctly and then renders blank
+ * certificates.
+ */
+export interface CsvMapping {
+  nameCol: string;
+  /** Empty when the file has no address column — a generate-only run needs none. */
+  emailCol: string;
+}
+
+/* The email column is optional, so the select needs a way to say "none" that a
+   real header can't collide with. */
+const NO_EMAIL = "__none__";
+
+/** Columns whose values are joined to make the one name on the certificate. */
+const nameParts = (nameCol: string) =>
+  nameCol.split(",").map((c) => c.trim()).filter(Boolean);
+
+/** The name a row contributes, matching what the backend will produce. */
+export function rowName(row: Record<string, string>, nameCol: string): string {
+  return nameParts(nameCol)
+    .map((c) => (row[c] ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
+ * "First Name" + "Last Name" as one selectable option.
+ *
+ * A certificate carries a single name, so a file that splits it across two
+ * columns needs both. Choosing either one alone silently halves every name —
+ * "Ada" where "Ada Lovelace" was meant — and no amount of picking a different
+ * single column fixes it, which is why this is an option rather than a warning.
+ */
+function splitNameOption(cols: string[]): string {
+  const first = cols.find((c) => /first\s*name/i.test(c));
+  const last = cols.find((c) => /last\s*name|surname|family\s*name/i.test(c));
+  return first && last && first !== last ? `${first},${last}` : "";
+}
+
 interface Props {
-  onReady: (rows: CsvRow[], file: File) => void;
+  onReady: (rows: CsvRow[], file: File, mapping: CsvMapping) => void;
 }
 
 export function CsvUploader({ onReady }: Props) {
@@ -46,8 +90,15 @@ export function CsvUploader({ onReady }: Props) {
         setHeaders(cols);
         setRawRows(result.data);
 
-        // Auto-detect name + email columns (case-insensitive)
-        const nc = cols.find((c) => c.toLowerCase().includes("name")) ?? "";
+        // Auto-detect the columns (case-insensitive). Both stay empty rather
+        // than guessing if nothing matches.
+        //
+        // A split name wins over the generic match: "First Name, Last Name"
+        // contains "name" and would otherwise select the first column alone.
+        const nc =
+          splitNameOption(cols) ||
+          cols.find((c) => c.toLowerCase().includes("name")) ||
+          "";
         const ec =
           cols.find(
             (c) => c.toLowerCase().includes("email") || c.toLowerCase().includes("e-mail")
@@ -73,14 +124,20 @@ export function CsvUploader({ onReady }: Props) {
   };
 
   const handleConfirm = () => {
-    if (!file || !nameCol || !emailCol) return;
+    // A name is the only thing a certificate needs. The address is what makes
+    // it *sendable*, and that is the run's problem, not the file's.
+    if (!file || !nameCol) return;
     const rows: CsvRow[] = rawRows
-      .map((r) => ({ name: r[nameCol]?.trim() ?? "", email: r[emailCol]?.trim() ?? "" }))
+      .map((r) => ({
+        name: rowName(r, nameCol),
+        email: emailCol ? (r[emailCol]?.trim() ?? "") : "",
+      }))
       .filter((r) => r.name || r.email);
-    onReady(rows, file);
+    onReady(rows, file, { nameCol, emailCol });
   };
 
   const invalidCount = Object.values(validation).filter((v) => !v.valid).length;
+  const combinedName = splitNameOption(headers);
 
   return (
     <div className="space-y-4">
@@ -122,6 +179,11 @@ export function CsvUploader({ onReady }: Props) {
                 <SelectValue placeholder="Select column" />
               </SelectTrigger>
               <SelectContent>
+                {combinedName && (
+                  <SelectItem value={combinedName}>
+                    {nameParts(combinedName).join(" + ")}
+                  </SelectItem>
+                )}
                 {headers.map((h) => (
                   <SelectItem key={h} value={h}>
                     {h}
@@ -134,11 +196,15 @@ export function CsvUploader({ onReady }: Props) {
             <label htmlFor="csv-email-col" className="label-mono block">
               Email column
             </label>
-            <Select value={emailCol} onValueChange={(v) => setEmailCol(v ?? "")}>
+            <Select
+              value={emailCol || NO_EMAIL}
+              onValueChange={(v) => setEmailCol(v === NO_EMAIL ? "" : (v ?? ""))}
+            >
               <SelectTrigger id="csv-email-col">
                 <SelectValue placeholder="Select column" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={NO_EMAIL}>No email column</SelectItem>
                 {headers.map((h) => (
                   <SelectItem key={h} value={h}>
                     {h}
@@ -146,6 +212,10 @@ export function CsvUploader({ onReady }: Props) {
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              Only needed to send. Without one you can still generate every
+              certificate.
+            </p>
           </div>
         </div>
       )}
@@ -174,7 +244,7 @@ export function CsvUploader({ onReady }: Props) {
       )}
 
       {/* Preview */}
-      {rawRows.length > 0 && nameCol && emailCol && (
+      {rawRows.length > 0 && nameCol && (
         <>
           <div className="overflow-hidden rounded-lg border border-border">
             <div className="max-h-52 overflow-y-auto">
@@ -187,12 +257,16 @@ export function CsvUploader({ onReady }: Props) {
                     <th className="label-mono px-3 py-2 text-left font-medium">
                       Name
                     </th>
-                    <th className="label-mono px-3 py-2 text-left font-medium">
-                      Email
-                    </th>
-                    <th className="label-mono px-3 py-2 text-left font-medium">
-                      Domain
-                    </th>
+                    {emailCol && (
+                      <>
+                        <th className="label-mono px-3 py-2 text-left font-medium">
+                          Email
+                        </th>
+                        <th className="label-mono px-3 py-2 text-left font-medium">
+                          Domain
+                        </th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -208,24 +282,28 @@ export function CsvUploader({ onReady }: Props) {
                           {i + 1}
                         </td>
                         <td className="px-3 py-1.5 text-[13px]">
-                          {row[nameCol] ?? ""}
+                          {rowName(row, nameCol)}
                         </td>
-                        <td className="px-3 py-1.5 font-mono text-[12px]">
-                          {row[emailCol] ?? ""}
-                        </td>
-                        <td className="px-3 py-1.5 text-[12px]">
-                          {v ? (
-                            v.valid ? (
-                              <span className="text-sage-ink">Valid</span>
-                            ) : (
-                              <span className="text-amber-ink" title={v.reason}>
-                                {v.reason}
-                              </span>
-                            )
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
+                        {emailCol && (
+                          <>
+                            <td className="px-3 py-1.5 font-mono text-[12px]">
+                              {row[emailCol] ?? ""}
+                            </td>
+                            <td className="px-3 py-1.5 text-[12px]">
+                              {v ? (
+                                v.valid ? (
+                                  <span className="text-sage-ink">Valid</span>
+                                ) : (
+                                  <span className="text-amber-ink" title={v.reason}>
+                                    {v.reason}
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })}
@@ -241,12 +319,7 @@ export function CsvUploader({ onReady }: Props) {
             </p>
           )}
 
-          <Button
-            type="button"
-            size="sm"
-            disabled={!nameCol || !emailCol}
-            onClick={handleConfirm}
-          >
+          <Button type="button" size="sm" disabled={!nameCol} onClick={handleConfirm}>
             Use this CSV — {rawRows.length} rows
           </Button>
         </>

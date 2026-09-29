@@ -283,6 +283,16 @@ This is not redundant with **Check exact output**, which is the reason it was wo
 
 **It skips address validation entirely, and that is not just an optimisation.** Phase 1's result, `valid_indices`, is what phase 2 iterates — so validating a generate-only run does not merely waste DNS lookups, it *drops* the rows whose domains do not resolve from generation. "Generate all" would hand back fewer certificates than there are names, which is the one thing the feature cannot do. A generate-only run therefore takes every row, marks nothing invalid, and produces no `validating` phase.
 
+#### Which CSV column is which
+
+The backend re-parses the uploaded file itself, so the column names the uploader resolved have to travel with the job. They were hardcoded to `"name"` and `"email"` — meaning a file headed `Full Name,Email` previewed correctly in the browser and then rendered **blank certificates**, because the side that draws them was looking for a column that did not exist. Nothing errored. `CsvMapping` now carries the selection from the uploader through to the job.
+
+The **email column is optional**, because it is the run that needs an address, not the certificate. A names-only sheet is enough to generate; switching to send without one is refused with a message that names the way out, rather than marking every row `invalid_domain` and looking like bad data.
+
+**A name may live in two columns.** `First Name` + `Last Name` cannot be expressed by a single-column mapping, and picking either one alone silently halves every name — "Ada" where "Ada Lovelace" was meant, visible in the preview but only to someone who thought to look. The uploader offers the pair as one option and `name_col` carries both comma-separated, joined with a space. A half-filled pair does not leave a stray space, which would otherwise throw off the centring.
+
+Auto-detection is substring matching, so `Full Name`, `Email Address`, `Email ID`, `E-mail`, `Surname` and `student_name` all resolve. It is greedy, though: with `Company Name` before `Participant` it picks the company. That is a guess, and the dropdown and the preview are the correction — which is why the split-name case is handled by *offering* rather than by guessing better, and why the wrong-column case above is worth the carrying of a mapping at all.
+
 The zip is built with `ZIP_STORED`, not deflated: the PDFs are mostly JPEG, so deflating spends CPU to save almost nothing. It streams off a temp file rather than being assembled in memory, because a thousand certificates is a few hundred megabytes, and the temp file is removed once the response has been sent.
 
 **Check exact output** remains for the editing loop — it is faster and it belongs next to the thing being edited.

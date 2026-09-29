@@ -200,19 +200,38 @@ async def create_job(
         raise HTTPException(status_code=422, detail=f"Cannot parse CSV: {exc}")
 
     # Map columns
-    name_col = cfg.name_col
+    # A name can be split across columns ("First Name", "Last Name"), in which
+    # case name_col carries both, comma-separated. They are joined with a space,
+    # because that is what the two of them mean together and a certificate
+    # carries one name — reading only the first column would silently halve
+    # every name on it. An address is never split.
+    name_cols = [c.strip().lower() for c in (cfg.name_col or "").split(",") if c.strip()]
     email_col = cfg.email_col
     csv_rows = []
     for row in all_rows:
         # Case-insensitive column lookup
         row_lower = {k.lower(): v for k, v in row.items()}
-        name = row_lower.get(name_col.lower(), "").strip()
+        name = " ".join(row_lower.get(c, "").strip() for c in name_cols).strip()
         email = row_lower.get(email_col.lower(), "").strip()
         if name or email:
             csv_rows.append({"name": name, "email": email})
 
     if not csv_rows:
         raise HTTPException(status_code=422, detail="CSV contains no usable rows")
+
+    # A generate-only run needs no addresses, so a names-only CSV is fine there.
+    # Sending does need them, and without this guard every row would come back
+    # "invalid_domain" — which reads as a problem with the data rather than a
+    # missing column.
+    if not cfg.dry_run and not any(row.get("email") for row in csv_rows):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This CSV has no email addresses, so there is nobody to send to. "
+                "Switch on Generate all and download to produce the certificates "
+                "without sending them."
+            ),
+        )
 
     # Create Job record
     job = Job(

@@ -10,7 +10,7 @@ import {
   type Event,
   type DuplicateRecipient,
 } from "@/lib/api";
-import { CsvUploader, type CsvRow } from "@/components/CsvUploader";
+import { CsvUploader, type CsvMapping, type CsvRow } from "@/components/CsvUploader";
 import { JobProgress } from "@/components/JobProgress";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,9 @@ interface TierSetup {
   checked: boolean;
   csvFile: File | null;
   csvRows: CsvRow[] | null;
+  /** Which CSV columns the rows came from — the job needs these, not just us. */
+  nameCol: string;
+  emailCol: string;
   emailSubject: string;
   emailBody: string;
 }
@@ -73,6 +76,8 @@ function RunPageInner() {
             checked: preselect ? ev.id === preselect : false,
             csvFile: null,
             csvRows: null,
+            nameCol: "name",
+            emailCol: "email",
             emailSubject: "",
             emailBody:
               "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards",
@@ -87,10 +92,23 @@ function RunPageInner() {
       prev.map((t) => (t.event.id === id ? { ...t, checked: !t.checked } : t))
     );
 
-  const setCsv = (id: string, rows: CsvRow[], file: File) =>
+  const setCsv = (
+    id: string,
+    rows: CsvRow[],
+    file: File,
+    mapping: CsvMapping
+  ) =>
     setTiers((prev) =>
       prev.map((t) =>
-        t.event.id === id ? { ...t, csvFile: file, csvRows: rows } : t
+        t.event.id === id
+          ? {
+              ...t,
+              csvFile: file,
+              csvRows: rows,
+              nameCol: mapping.nameCol,
+              emailCol: mapping.emailCol,
+            }
+          : t
       )
     );
 
@@ -104,12 +122,20 @@ function RunPageInner() {
     );
 
   const selectedTiers = tiers.filter((t) => t.checked);
-  const allReady =
-    selectedTiers.length > 0 && selectedTiers.every((t) => t.csvFile !== null);
   const totalRows = selectedTiers.reduce(
     (n, t) => n + (t.csvRows?.length ?? 0),
     0
   );
+
+  /* A real send needs somewhere to send. A generate-only run doesn't, which is
+     the only reason the email column is optional. */
+  const missingEmail = dryRun
+    ? []
+    : selectedTiers.filter((t) => t.csvFile !== null && !t.emailCol);
+  const allReady =
+    selectedTiers.length > 0 &&
+    selectedTiers.every((t) => t.csvFile !== null) &&
+    missingEmail.length === 0;
 
   const handleStart = async () => {
     setStarting(true);
@@ -160,8 +186,11 @@ function RunPageInner() {
         email_body: tier.emailBody,
         dry_run: dryRun,
         batch_size: batchSize,
-        name_col: "name",
-        email_col: "email",
+        // The columns the user actually picked. Hardcoding "name"/"email" meant
+        // a CSV headed "Full Name" previewed fine and then rendered blank
+        // certificates, because the backend re-parses the file itself.
+        name_col: tier.nameCol,
+        email_col: tier.emailCol,
       };
       const { job_id } = await createJob(config, tier.csvFile!);
       jobs.push({
@@ -310,8 +339,8 @@ function RunPageInner() {
                       )}
 
                       <CsvUploader
-                        onReady={(rows, file) =>
-                          setCsv(tier.event.id, rows, file)
+                        onReady={(rows, file, mapping) =>
+                          setCsv(tier.event.id, rows, file, mapping)
                         }
                       />
 
@@ -424,6 +453,15 @@ function RunPageInner() {
               className="rounded-md bg-rose px-3 py-2 text-[13px] text-rose-ink"
             >
               {error}
+            </p>
+          )}
+
+          {missingEmail.length > 0 && (
+            <p className="rounded-md bg-amber px-3 py-2 text-[13px] leading-relaxed text-amber-ink">
+              {missingEmail.map((t) => t.event.name).join(", ")} — no email column
+              selected, so there is nowhere to send. Pick one, or switch on{" "}
+              <span className="font-medium">Generate all and download</span> to
+              produce the certificates without sending them.
             </p>
           )}
 
