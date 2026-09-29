@@ -95,14 +95,19 @@ export function CsvUploader({ onReady }: Props) {
         //
         // A split name wins over the generic match: "First Name, Last Name"
         // contains "name" and would otherwise select the first column alone.
-        const nc =
-          splitNameOption(cols) ||
-          cols.find((c) => c.toLowerCase().includes("name")) ||
-          "";
         const ec =
           cols.find(
             (c) => c.toLowerCase().includes("email") || c.toLowerCase().includes("e-mail")
           ) ?? "";
+        const nc =
+          splitNameOption(cols) ||
+          cols.find((c) => c.toLowerCase().includes("name")) ||
+          // A single column that isn't the address is the name. A one-column
+          // file is the simplest case there is, and "Participant" or "Recipient"
+          // contains no hint to match on — leaving it blank would mean the
+          // easiest possible CSV needs a manual pick.
+          (cols.length === 1 && cols[0] !== ec ? cols[0] : "") ||
+          "";
         setNameCol(nc);
         setEmailCol(ec);
       },
