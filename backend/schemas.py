@@ -1,6 +1,7 @@
+import json
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +85,21 @@ class JobResponse(BaseModel):
     created_at: datetime
     finished_at: Optional[datetime]
     rows: List[JobRowResponse] = []
+    # The config this job ran with, frozen at creation. Exposed so a retry can
+    # rebuild it without needing the event to still exist — and so the original
+    # message can prefill the retry's subject and body.
+    event_snapshot: Optional[dict] = None
+
+    @field_validator("event_snapshot", mode="before")
+    @classmethod
+    def _parse_snapshot(cls, v):
+        # Stored as a JSON string in a Text column.
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except ValueError:
+                return None
+        return v
 
     class Config:
         from_attributes = True

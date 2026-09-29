@@ -158,16 +158,23 @@ async def create_job(
             "font_style": event.font_style,
             "font_color": event.font_color,
             "max_text_width": event.max_text_width,
-            # Email always comes from the run-time config, not the event
-            "email_subject": cfg.email_subject,
-            "email_body": cfg.email_body,
         }
         event_name = event.name
     elif cfg.event_config:
-        event_config = cfg.event_config.model_dump()
+        # exclude_none keeps this close to the shape the event_id path stores.
+        # Without it every optional field is written as an explicit null.
+        event_config = cfg.event_config.model_dump(exclude_none=True)
         event_name = event_config.get("name", "One-off")
     else:
         raise HTTPException(status_code=422, detail="Either event_id or event_config must be provided")
+
+    # Email is run-time, never part of the event, so it is stamped onto the
+    # config on *both* paths — job_runner reads the subject and body from here,
+    # and the snapshot records them. Setting it only on the event_id path meant
+    # an inline config silently sent the default subject and body, which is how
+    # a re-send's rewritten message would have vanished.
+    event_config["email_subject"] = cfg.email_subject
+    event_config["email_body"] = cfg.email_body
 
     # A missing template or font would mark every row failed while the job ran
     # to completion. Reject the request instead.

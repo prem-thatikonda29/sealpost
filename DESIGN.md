@@ -250,13 +250,24 @@ Only `sent` counts as delivered: a bounced or failed row reached nobody, so re-s
 
 And a failed check never becomes a send. If the lookup errors, the run stops and says so — an unreachable check must not read as "no duplicates".
 
+### Re-sending
+
+A job's job is not done when it finishes. Somebody always misses the mail, and the record of who is already on the job page — so the re-send lives there rather than in a separate flow.
+
+**It is not a special send path.** A re-send builds a CSV of the affected rows in the browser and posts it to the same `createJob` the Run page uses. It becomes a new job, so it inherits MX validation, the duplicate check, the progress stream and the attachment encoding for free, and the original attempt stays in history as the record of what actually happened. No endpoint was added for it.
+
+**Split by reason, not lumped.** `failed` is retryable — that is a transient error, and trying again is the whole point. `invalid_domain` and `bounced` are not: the first has no mail records, the second was accepted and came back undeliverable. Retrying either fails identically every time, so they are held out of the button and given their own block explaining why, with an export to correct and re-upload. A single "retry all" would have re-failed those rows on every click and read as a broken button.
+
+**Certificate frozen, message editable.** The certificate is rebuilt from the job's `event_snapshot`, so it is the same one everyone else received — a set of certificates that differ between recipients is worse than one that is slightly out of date. The subject and body are prefilled from that snapshot but editable, because a re-send often needs to say something the original did not: *"the certificate didn't reach you, here it is."* The two are already separate in the API (`event_config` against `email_subject` / `email_body`), and `05a1d71` had already moved email content to run-time.
+
+**Address edits are re-validated for free.** A corrected address goes through the same phase-1 MX check as any other send, so nothing needs to guard it separately.
+
 #### Check exact output
 
 Beneath the canvas, a `<details>` disclosure mounts `CertPreview`, which POSTs to `/api/preview` and renders the true server-side PNG — same `fit_font` shrink, same Pillow shaping, same face. It is collapsed by default and mounted only once a template and a position exist, so opening it is never a dead end. The canvas above it updates per keystroke with no round-trip; this is the thing you open when the name is nearly right and you want to stop guessing.
 
 ## Known gaps
 
-- **Re-sending a certificate to one person is not possible.** The history page's copy implies it, but no endpoint exists, and a re-send would need to re-render — which today only happens inside a job.
 - **`components/ui/card.tsx` and `label.tsx` are unreferenced.** Every other primitive in `ui/` is imported by at least one screen. `Card` is the one to think about rather than merely delete: the app's grid device is a hairline-separated `div`, not a card, so if it gets used it should be checked against that rule first. `Label` is superseded by the `.label-mono` class, which is what actually encodes the label register.
 
 ## Accepted limitations
@@ -265,3 +276,4 @@ Deliberate, not deferred. Each was considered and the cost was judged worth payi
 
 - **An uploaded font renders in its regular face only.** The upload route stores one file under a fresh UUID prefix, so nothing can sit beside it for `_load_font`'s sibling probe to find — uploading `Inter-Bold.ttf` renders bold for *every* style, including normal. Fixing it means a multi-file upload and a naming scheme that preserves the stem. The 14 bundled families are unaffected and cover the common case; uploads exist for the font someone already has. The picker reports one style for an upload rather than offering weights that will not render.
 - **`max_text_width` bounds the span horizontally only.** A name wider than the template's height still overflows vertically. Nothing enforces a vertical bound, which is why the canvas guides are lines and not a box — see above.
+- **A re-send sends the certificate from the job's snapshot, not the event's current settings.** If the template has been edited since, the re-send still produces the version everyone else received, because a certificate that differs between recipients is worse than one that is slightly out of date. Changing the certificate is a new send, which is what the Run page is for.

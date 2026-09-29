@@ -47,6 +47,13 @@ export interface Job {
   created_at: string;
   finished_at?: string;
   rows?: JobRow[];
+  /**
+   * The config this job ran with, frozen when it started. A re-send rebuilds
+   * from this rather than from the event, so it works even for a job whose
+   * event was deleted — and so the certificate stays identical to the one
+   * everyone else received.
+   */
+  event_snapshot?: Record<string, any>;
 }
 
 export interface TemplateUpload {

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { getJob, type Job, type JobRow } from "@/lib/api";
+import { downloadCsv, rowsToRecordCsv } from "@/lib/csv";
+import { ResendPanel } from "@/components/ResendPanel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
@@ -16,25 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-function downloadCsv(rows: JobRow[], jobId: string) {
-  const header = ["#", "Name", "Email", "Status", "Error"];
-  const lines = rows.map((r) => [
-    r.row_index + 1,
-    `"${r.name.replace(/"/g, '""')}"`,
-    r.email,
-    r.status,
-    `"${(r.error_message ?? "").replace(/"/g, '""')}"`,
-  ]);
-  const csv = [header, ...lines].map((r) => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `job_${jobId.slice(0, 8)}_results.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -84,6 +67,13 @@ export default function JobDetailPage() {
 
   const rows = job.rows ?? [];
 
+  /* Everything that did not get a certificate. A dry run's rows are "skipped",
+     which means nothing was attempted — not that it failed — so they are not
+     here. */
+  const undelivered = rows.filter((r) =>
+    ["failed", "invalid_domain", "bounced"].includes(r.status)
+  );
+
   const summary = [
     { label: "Sent", value: job.sent_count, tone: "text-sage-ink" },
     { label: "Failed", value: job.failed_count, tone: "text-rose-ink" },
@@ -104,14 +94,35 @@ export default function JobDetailPage() {
         title={job.event_name ?? "One-off job"}
         subtitle={`${new Date(job.created_at).toLocaleString()}${job.dry_run ? " · dry run" : ""}`}
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => downloadCsv(rows, job.id)}
-            disabled={rows.length === 0}
-          >
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                downloadCsv(
+                  rowsToRecordCsv(rows),
+                  `job_${job.id.slice(0, 8)}_records.csv`
+                )
+              }
+              disabled={rows.length === 0}
+            >
+              Export all {rows.length}
+            </Button>
+            {undelivered.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  downloadCsv(
+                    rowsToRecordCsv(undelivered),
+                    `job_${job.id.slice(0, 8)}_undelivered.csv`
+                  )
+                }
+              >
+                Export {undelivered.length} undelivered
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -125,6 +136,12 @@ export default function JobDetailPage() {
           </div>
         ))}
       </div>
+
+      {/* Keyed by job so the form resets when you open a different one. Moving
+          between two job pages reuses this component, and the subject and body
+          are seeded from the snapshot — without the key they would carry the
+          previous job's message across. */}
+      <ResendPanel key={job.id} job={job} rows={rows} />
 
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-hair-hover px-6 py-12 text-center">

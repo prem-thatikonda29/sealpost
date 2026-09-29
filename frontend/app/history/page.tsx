@@ -42,8 +42,8 @@ export default function HistoryPage() {
           </p>
           <p className="measure mx-auto mt-2 text-[13px] leading-relaxed text-muted-foreground">
             Every run is recorded here with a per-row outcome — what was sent,
-            what bounced, what failed and why — so you can export the failures
-            and re-send only those.
+            what bounced, what failed and why. Open one to re-send to whoever
+            missed out, or to export the records.
           </p>
           <Link
             href="/run"
