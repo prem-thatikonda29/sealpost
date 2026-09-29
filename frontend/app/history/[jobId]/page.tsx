@@ -4,18 +4,18 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { getJob, type Job, type JobRow } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const STATUS_BADGE: Record<string, string> = {
-  sent: "bg-green-100 text-green-800 border-green-300",
-  failed: "bg-red-100 text-red-800 border-red-300",
-  invalid_domain: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  bounced: "bg-orange-100 text-orange-800 border-orange-300",
-  skipped: "bg-slate-100 text-slate-600 border-slate-300",
-  pending: "bg-muted text-muted-foreground border-border",
-};
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 function downloadCsv(rows: JobRow[], jobId: string) {
   const header = ["#", "Name", "Email", "Status", "Error"];
@@ -42,91 +42,130 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getJob(jobId).then(setJob).finally(() => setLoading(false));
+    getJob(jobId)
+      .then(setJob)
+      .finally(() => setLoading(false));
   }, [jobId]);
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
-  if (!job) return <p className="text-sm text-destructive">Job not found</p>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-4 w-20" />
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-52" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    );
+  }
+
+  if (!job) {
+    return (
+      <div className="space-y-6">
+        <Link
+          href="/history"
+          className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          ← History
+        </Link>
+        <div className="rounded-lg border border-dashed border-hair-hover px-6 py-16 text-center">
+          <p className="font-serif text-lg tracking-[-0.02em] text-foreground">
+            Job not found
+          </p>
+          <p className="mt-2 text-[13px] text-muted-foreground">
+            It may have been removed, or the link is incomplete.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const rows = job.rows ?? [];
 
+  const summary = [
+    { label: "Sent", value: job.sent_count, tone: "text-sage-ink" },
+    { label: "Failed", value: job.failed_count, tone: "text-rose-ink" },
+    { label: "Invalid", value: job.invalid_count, tone: "text-amber-ink" },
+    { label: "Bounced", value: job.bounced_count, tone: "text-terra-ink" },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link href="/history" className="text-sm text-muted-foreground hover:underline">
-            ← History
-          </Link>
-          <h1 className="text-xl font-semibold mt-1">
-            {job.event_name ?? "One-off job"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {new Date(job.created_at).toLocaleString()}
-            {job.dry_run && <span className="ml-2 italic">dry run</span>}
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => downloadCsv(rows, job.id)}>
-          Export CSV
-        </Button>
-      </div>
+      <Link
+        href="/history"
+        className="inline-block text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+      >
+        ← History
+      </Link>
 
-      {/* Summary */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: "Sent", value: job.sent_count, color: "text-green-700" },
-          { label: "Failed", value: job.failed_count, color: "text-red-700" },
-          { label: "Invalid", value: job.invalid_count, color: "text-yellow-700" },
-          { label: "Bounced", value: job.bounced_count, color: "text-orange-700" },
-        ].map(({ label, value, color }) => (
-          <Card key={label}>
-            <CardContent className="pt-4 text-center">
-              <p className={`text-2xl font-semibold ${color}`}>{value}</p>
-              <p className="text-xs text-muted-foreground">{label}</p>
-            </CardContent>
-          </Card>
+      <PageHeader
+        title={job.event_name ?? "One-off job"}
+        subtitle={`${new Date(job.created_at).toLocaleString()}${job.dry_run ? " · dry run" : ""}`}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadCsv(rows, job.id)}
+            disabled={rows.length === 0}
+          >
+            Export CSV
+          </Button>
+        }
+      />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 hairline-grid">
+        {summary.map(({ label, value, tone }) => (
+          <div key={label} className="px-4 py-5">
+            <p className={`font-mono text-2xl leading-none tabular ${tone}`}>
+              {value}
+            </p>
+            <p className="label-mono mt-2">{label}</p>
+          </div>
         ))}
       </div>
 
-      {/* Row table */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Rows ({rows.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted border-b">
-                <tr>
-                  <th className="text-left px-4 py-2 font-medium">#</th>
-                  <th className="text-left px-4 py-2 font-medium">Name</th>
-                  <th className="text-left px-4 py-2 font-medium">Email</th>
-                  <th className="text-left px-4 py-2 font-medium">Status</th>
-                  <th className="text-left px-4 py-2 font-medium">Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 text-muted-foreground">{row.row_index + 1}</td>
-                    <td className="px-4 py-2">{row.name}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{row.email}</td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`text-xs border rounded px-1.5 py-0.5 ${STATUS_BADGE[row.status] ?? STATUS_BADGE.pending}`}
-                      >
-                        {row.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-xs text-muted-foreground">
-                      {row.error_message ?? ""}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {rows.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-hair-hover px-6 py-12 text-center">
+          <p className="text-[13px] text-muted-foreground">
+            This job has no recorded rows.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-muted">
+                <TableHead className="w-14">#</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Note</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-mono text-[12px] text-muted-foreground tabular">
+                    {row.row_index + 1}
+                  </TableCell>
+                  <TableCell>{row.name}</TableCell>
+                  <TableCell className="font-mono text-[12px]">
+                    {row.email}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={row.status} />
+                  </TableCell>
+                  <TableCell className="max-w-[24ch] truncate text-[13px] text-muted-foreground">
+                    {row.error_message ?? ""}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }

@@ -28,7 +28,7 @@ function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
   return (
     <ProgressPrimitive.Track
       className={cn(
-        "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted",
+        "relative flex h-1.5 w-full items-center overflow-x-hidden rounded-full bg-muted",
         className
       )}
       data-slot="progress-track"
@@ -37,6 +37,8 @@ function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
   )
 }
 
+/* Deep sage rather than the brand tint — the indicator needs to read as a
+   filled bar against the muted track, and #D9E2D4 does not. */
 function ProgressIndicator({
   className,
   ...props
@@ -44,7 +46,10 @@ function ProgressIndicator({
   return (
     <ProgressPrimitive.Indicator
       data-slot="progress-indicator"
-      className={cn("h-full bg-primary transition-all", className)}
+      className={cn(
+        "h-full bg-sage-ink transition-[width] duration-200 ease-out-quart",
+        className
+      )}
       {...props}
     />
   )
@@ -53,7 +58,7 @@ function ProgressIndicator({
 function ProgressLabel({ className, ...props }: ProgressPrimitive.Label.Props) {
   return (
     <ProgressPrimitive.Label
-      className={cn("text-sm font-medium", className)}
+      className={cn("text-[13px] font-medium", className)}
       data-slot="progress-label"
       {...props}
     />
@@ -64,7 +69,7 @@ function ProgressValue({ className, ...props }: ProgressPrimitive.Value.Props) {
   return (
     <ProgressPrimitive.Value
       className={cn(
-        "ml-auto text-sm text-muted-foreground tabular-nums",
+        "ml-auto font-mono text-[13px] text-muted-foreground tabular-nums",
         className
       )}
       data-slot="progress-value"

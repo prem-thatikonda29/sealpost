@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getEvent, updateEvent, type Event } from "@/lib/api";
 import { EventForm } from "@/components/EventForm";
+import { PageHeader } from "@/components/PageHeader";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EditEventPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,15 +28,20 @@ export default function EditEventPage() {
   };
 
   if (!event) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <Skeleton className="h-[540px] w-full" />
+      </div>
+    );
   }
 
   return (
-    <div>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold">Edit Event</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{event.name}</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Edit Event" subtitle={event.name} />
       <EventForm initial={event} onSave={handleSave} saving={saving} />
     </div>
   );

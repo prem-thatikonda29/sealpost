@@ -17,6 +17,7 @@ from sse_starlette.sse import EventSourceResponse
 from ..database import get_db
 from ..models import Job, JobRow, Event
 from ..schemas import JobCreate, JobResponse, JobListItem, JobRowResponse, EmailValidationResult
+from ..cert_engine import validate_inputs
 from .. import job_runner
 from ..email_validator import validate_format, validate_mx
 
@@ -90,6 +91,13 @@ async def create_job(
         event_name = event_config.get("name", "One-off")
     else:
         raise HTTPException(status_code=422, detail="Either event_id or event_config must be provided")
+
+    # A missing template or font would mark every row failed while the job ran
+    # to completion. Reject the request instead.
+    try:
+        validate_inputs(event_config.get("template_path"), event_config.get("font_path"))
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     # Parse CSV
     raw = await csv_file.read()

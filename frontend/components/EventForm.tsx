@@ -1,18 +1,24 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { uploadTemplate, templateUrl, type Event } from "@/lib/api";
+import { CertPreview } from "@/components/CertPreview";
+import { FontPicker, type FontSelection } from "@/components/FontPicker";
+import { fitFontSize, useFontFace } from "@/lib/fonts";
+import {
+  fontFileUrl,
+  listFonts,
+  templateUrl,
+  uploadFont,
+  uploadTemplate,
+  type Event,
+  type FontEntry,
+} from "@/lib/api";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -44,10 +50,28 @@ interface OverlayProps {
   fontSize: number;
   fontStyle: string;
   fontColor: string;
-  fontFamily: string;
+  fontFamily: string | null;
+  maxTextWidth: number;
   sampleText: string;
   onPositionChange: (x: number, y: number) => void;
 }
+
+/* Keyboard nudge. Shift is the coarse step for crossing a wide certificate
+   quickly; 1px is fine enough to centre a name exactly. */
+const NUDGE_FINE = 1;
+const NUDGE_COARSE = 10;
+
+const NUDGE_KEYS: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+};
+
+/* Never clamp to exactly 0: "0" is this app's sentinel for *no position*, so a
+   nudge to the left or top edge would make the name disappear instead of
+   sitting against the border. 1px is inside the frame and still placed. */
+const clampTo = (v: number, max: number) => Math.max(1, Math.min(max - 1, v));
 
 function CertCanvas({
   templateUrl,
@@ -59,10 +83,13 @@ function CertCanvas({
   fontStyle,
   fontColor,
   fontFamily,
+  maxTextWidth,
   sampleText,
   onPositionChange,
 }: OverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const hintId = useId();
+  const [focused, setFocused] = useState(false);
 
   // Click on canvas → compute original-space coords
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -88,15 +115,64 @@ function CertCanvas({
   const scale = naturalWidth > 0 && containerW > 0 ? containerW / naturalWidth : 0;
   const textDisplayX = posX * scale;
   const textDisplayY = posY * scale;
-  const displayFontSize = Math.max(fontSize * scale, 8);
+  // The name auto-shrinks past max_text_width. Mirror cert_engine.fit_font so
+  // the canvas shows the size the PDF will use, not the un-fitted size.
+  const fittedSize = fitFontSize(
+    sampleText || "Sample Name",
+    fontSize,
+    maxTextWidth,
+    fontFamily,
+    fontStyle
+  );
+  const displayFontSize = Math.max(fittedSize * scale, 8);
 
   const isBold = fontStyle === "bold" || fontStyle === "bold_italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold_italic";
+  const hasPosition = posX > 0 && posY > 0;
+
+  /* Centre is the keyboard equivalent of "where the pointer would have
+     clicked" — the neutral starting point when nothing is placed yet. */
+  const centre = () => ({
+    x: Math.round(naturalWidth / 2),
+    y: Math.round(naturalHeight / 2),
+  });
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!naturalWidth || !naturalHeight) return;
+
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const c = centre();
+      onPositionChange(c.x, c.y);
+      return;
+    }
+
+    const dir = NUDGE_KEYS[e.key];
+    if (!dir) return;
+
+    // Arrow keys must not scroll the page — this element owns them while focused.
+    e.preventDefault();
+
+    const step = e.shiftKey ? NUDGE_COARSE : NUDGE_FINE;
+    const from = hasPosition ? { x: posX, y: posY } : centre();
+    onPositionChange(
+      clampTo(from.x + dir[0] * step, naturalWidth),
+      clampTo(from.y + dir[1] * step, naturalHeight)
+    );
+  };
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full cursor-crosshair select-none overflow-hidden rounded-lg"
+      role="application"
+      tabIndex={0}
+      aria-label="Certificate name position"
+      aria-describedby={hintId}
+      aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space"
+      onKeyDown={handleKeyDown}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      className="relative w-full cursor-crosshair select-none overflow-hidden rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       style={
         naturalWidth && naturalHeight
           ? { aspectRatio: `${naturalWidth} / ${naturalHeight}` }
@@ -104,24 +180,40 @@ function CertCanvas({
       }
       onClick={handleClick}
     >
+      {/* Keyboard path. The hint is read on focus; the readout announces each
+          nudge, so a non-visual user gets the same feedback as the coordinate
+          display gives a sighted one. */}
+      <span id={hintId} className="sr-only">
+        Certificate name position. Use the arrow keys to move the name, or hold
+        Shift with an arrow key to move ten pixels at a time. Press Enter to
+        place it at the centre.
+      </span>
+      <span aria-live="polite" aria-atomic="true" className="sr-only">
+        {hasPosition ? `${posX} by ${posY} pixels` : "Not placed yet"}
+      </span>
       {/* Template image — normal flow, sizes the container via aspect-ratio */}
       {templateUrl ? (
         <img
           src={templateUrl}
           alt="Certificate template"
-          className="absolute inset-0 w-full h-full object-fill pointer-events-none"
+          className="pointer-events-none absolute inset-0 h-full w-full object-fill"
           draggable={false}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/40 border-2 border-dashed border-muted-foreground/30 rounded-lg">
-          <p className="text-muted-foreground text-sm">Upload a template to begin</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-hair-hover bg-muted">
+          <p className="text-[13px] text-muted-foreground">
+            No template yet
+          </p>
+          <p className="text-[12px] text-muted-foreground">
+            Upload a JPEG or PNG to start placing the name
+          </p>
         </div>
       )}
 
       {/* Live text overlay — only render once we have a valid scale */}
-      {posX > 0 && posY > 0 && templateUrl && scale > 0 && (
+      {hasPosition && templateUrl && scale > 0 && (
         <div
-          className="absolute pointer-events-none"
+          className="pointer-events-none absolute"
           style={{
             left: textDisplayX,
             top: textDisplayY,
@@ -130,32 +222,40 @@ function CertCanvas({
             fontWeight: isBold ? 700 : 400,
             fontStyle: isItalic ? "italic" : "normal",
             color: fontColor,
-            fontFamily: fontFamily || "system-ui, sans-serif",
+            // The real face, from the same file the PDF renders with. Only
+            // falls back while the file is loading, or if it failed to load.
+            fontFamily: fontFamily ? `"${fontFamily}", var(--font-sans)` : undefined,
             whiteSpace: "nowrap",
-            lineHeight: 1.2,
-            textShadow: "0 0 4px rgba(0,0,0,0.15)",
+            // Pillow's "mm" anchor centres on the ascent/descent midline, which
+            // an em box (line-height 1) approximates. No text shadow: the PDF
+            // has none, and adding one here would be a preview that lies.
+            lineHeight: 1,
           }}
         >
           {sampleText || "Sample Name"}
         </div>
       )}
 
-      {/* Crosshair dot at position */}
-      {posX > 0 && posY > 0 && templateUrl && (
+      {/* Anchor marker at the placement point */}
+      {hasPosition && templateUrl && (
         <div
-          className="absolute pointer-events-none"
+          className="pointer-events-none absolute"
           style={{ left: textDisplayX, top: textDisplayY }}
         >
-          <div className="absolute bg-white/80 border border-primary rounded-full"
-            style={{ width: 8, height: 8, transform: "translate(-50%, -50%)" }} />
+          <div
+            className="absolute rounded-full border border-canvas bg-terra-ink"
+            style={{ width: 8, height: 8, transform: "translate(-50%, -50%)" }}
+          />
         </div>
       )}
 
       {/* Click hint when no position set */}
-      {(!posX || !posY) && templateUrl && (
-        <div className="absolute inset-0 flex items-end justify-center pb-4 pointer-events-none">
-          <span className="bg-black/50 text-white text-xs px-3 py-1 rounded-full">
-            Click to place text
+      {!hasPosition && templateUrl && (
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-center pb-4">
+          <span className="max-w-[90%] rounded-[3px] bg-ink/75 px-2.5 py-1 text-center font-mono text-[11px] tracking-[0.08em] text-canvas uppercase">
+            {focused
+              ? "Arrow keys to place · Enter for centre"
+              : "Click to place the name"}
           </span>
         </div>
       )}
@@ -164,6 +264,42 @@ function CertCanvas({
 }
 
 // ─── Main EventForm ────────────────────────────────────────────────────────────
+
+const SIZE_PRESETS = [24, 36, 48, 64];
+const COLOR_PRESETS = [
+  "#000000",
+  "#ffffff",
+  "#1a1a2e",
+  "#c8a96e",
+  "#2c3e50",
+  "#e74c3c",
+];
+
+/* The id of the family to fall back to when an event has no font saved yet.
+   Pinning the default to a real file (rather than letting font_path stay empty
+   and the PDF use the server's own fallback) is what keeps the canvas honest:
+   an empty font_path means the canvas and the PDF would render different
+   typefaces. */
+const DEFAULT_FONT_ID = "inter";
+
+const ALL_STYLES = ["normal", "bold", "italic"] as const;
+
+/** Whether a family ships a real file for this style. `_load_font` silently
+ *  falls back to the regular face when a variant is missing, so offering a
+ *  style that does not exist produces a canvas and a PDF that disagree. */
+function styleAvailable(styles: string[], style: string): boolean {
+  if (style === "normal") return true;
+  if (style === "bold_italic") return styles.includes("bold") && styles.includes("italic");
+  return styles.includes(style);
+}
+
+/** `uploads/fonts/<uuid>_Inter.ttf` → `Inter`. Used for fonts that were
+ *  uploaded in a previous session, where the response's `family` is long gone. */
+function uploadedFontLabel(path: string): string {
+  const filename = path.split("/").pop() ?? "";
+  const bare = filename.length > 37 ? filename.slice(37) : filename;
+  return bare.replace(/\.(ttf|otf)$/i, "") || "Uploaded font";
+}
 
 export function EventForm({ initial, onSave, saving }: Props) {
   const {
@@ -190,7 +326,10 @@ export function EventForm({ initial, onSave, saving }: Props) {
   const [templateDisplayUrl, setTemplateDisplayUrl] = useState(
     initial?.template_path ? templateUrl(initial.template_path) : ""
   );
-  const [fontPath, setFontPath] = useState(initial?.font_path ?? "");
+  const [fontSelection, setFontSelection] = useState<FontSelection | null>(null);
+  const [catalog, setCatalog] = useState<FontEntry[] | null>(null);
+  const [uploadingFont, setUploadingFont] = useState(false);
+  const [fontUploadError, setFontUploadError] = useState<string | null>(null);
   const [posX, setPosX] = useState(initial?.text_position_x ?? 0);
   const [posY, setPosY] = useState(initial?.text_position_y ?? 0);
   const [sampleText, setSampleText] = useState("Sample Name");
@@ -198,16 +337,100 @@ export function EventForm({ initial, onSave, saving }: Props) {
 
   const formValues = watch();
 
+  // The face actually registered in the document, and whether it failed. The
+  // canvas falls back to a system font on failure, so the error has to be shown
+  // somewhere — otherwise the only symptom is a subtly wrong typeface.
+  const { family: fontFamily, error: fontFaceError } = useFontFace(
+    fontSelection?.url ?? null
+  );
+
+  // Fetch the vendored catalog once. Held as `null` until it lands so the
+  // selection effect below can tell "no fonts" from "not loaded yet".
+  useEffect(() => {
+    let cancelled = false;
+    listFonts()
+      .then((fonts) => {
+        if (!cancelled) setCatalog(fonts);
+      })
+      .catch(() => {
+        // Not fatal: uploaded fonts resolve without the catalog, and the picker
+        // renders an empty list with its upload affordance still available.
+        if (!cancelled) setCatalog([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Resolve the saved font_path once — into a selection the picker and the
+  // canvas can both use. Runs again when the catalog arrives, because a
+  // vendored path cannot be turned into a URL without it.
+  const initialFontResolved = useRef(false);
+  useEffect(() => {
+    if (initialFontResolved.current || catalog === null) return;
+
+    const saved = initial?.font_path ?? "";
+    if (saved) {
+      const entry = catalog.find((f) => f.path === saved);
+      const url = entry?.url ?? fontFileUrl(saved, catalog);
+      if (url) {
+        initialFontResolved.current = true;
+        setFontSelection(
+          entry
+            ? {
+                path: entry.path,
+                url: entry.url,
+                label: entry.label,
+                styles: entry.styles,
+              }
+            : {
+                path: saved,
+                url,
+                label: uploadedFontLabel(saved),
+                // An upload is a single file; nothing probes for siblings, so
+                // the regular face is all this typeface can actually render.
+                styles: ["normal"],
+                uploaded: true,
+              }
+        );
+        return;
+      }
+    }
+
+    const fallback = catalog.find((f) => f.id === DEFAULT_FONT_ID) ?? catalog[0];
+    if (!fallback) return;
+    initialFontResolved.current = true;
+    setFontSelection({
+      path: fallback.path,
+      url: fallback.url,
+      label: fallback.label,
+      styles: fallback.styles,
+    });
+  }, [catalog, initial?.font_path]);
+
+  // A style the selected family has no file for renders as the regular weight
+  // in the PDF while the canvas fakes it with CSS. Snap the form back to a
+  // style that exists rather than letting the two disagree.
+  useEffect(() => {
+    if (!fontSelection) return;
+    if (!styleAvailable(fontSelection.styles, formValues.font_style)) {
+      setValue("font_style", "normal");
+    }
+  }, [fontSelection, formValues.font_style, setValue]);
+
   const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
       const res = await uploadTemplate(file);
-      setTemplatePath(`uploads/${res.template_id}_${file.name}`);
+      // Use the server's path rather than rebuilding it from `file.name`: the
+      // route strips any directory components before writing, so a browser
+      // that reports a path would otherwise leave the two disagreeing.
+      setTemplatePath(res.path);
       setTemplateNW(res.natural_width);
       setTemplateNH(res.natural_height);
-      setTemplateDisplayUrl(res.url);
+      setTemplateDisplayUrl(templateUrl(res.path));
       // Reset position when template changes
       setPosX(0);
       setPosY(0);
@@ -216,15 +439,27 @@ export function EventForm({ initial, onSave, saving }: Props) {
     }
   };
 
-  const handleFontUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
+  const handleFontUpload = async (file: File) => {
+    setUploadingFont(true);
+    setFontUploadError(null);
     try {
-      const res = await uploadTemplate(file);
-      setFontPath(`uploads/${res.template_id}_${file.name}`);
+      const res = await uploadFont(file);
+      setFontSelection({
+        path: res.path,
+        url: res.url,
+        label: res.family || file.name.replace(/\.(ttf|otf)$/i, ""),
+        styles: ["normal"],
+        uploaded: true,
+      });
+    } catch (e: any) {
+      // The old handler had a `finally` but no `catch`, so a rejected upload
+      // left the sidebar silently unchanged and font_path empty forever.
+      const detail = e?.response?.data?.detail;
+      setFontUploadError(
+        typeof detail === "string" ? detail : (e?.message ?? "Could not upload that font.")
+      );
     } finally {
-      setUploading(false);
+      setUploadingFont(false);
     }
   };
 
@@ -234,7 +469,7 @@ export function EventForm({ initial, onSave, saving }: Props) {
       template_path: templatePath || undefined,
       template_natural_width: templateNW || undefined,
       template_natural_height: templateNH || undefined,
-      font_path: fontPath || undefined,
+      font_path: fontSelection?.path || undefined,
       text_position_x: posX || undefined,
       text_position_y: posY || undefined,
     });
@@ -243,40 +478,57 @@ export function EventForm({ initial, onSave, saving }: Props) {
   // ── Layout: full-width canvas + fixed right sidebar ──────────────────────────
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 mb-4 px-1">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="min-w-0">
+      {/* ── Identity bar ────────────────────────────────────────────────────── */}
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-x-6 gap-y-3">
+          <div className="min-w-0 flex-1">
+            <label htmlFor="event-name" className="label-mono block">
+              Event name
+            </label>
             <Input
+              id="event-name"
               {...register("name")}
-              placeholder="Event name"
-              className="text-base font-medium border-0 shadow-none px-0 focus-visible:ring-0 bg-transparent"
+              placeholder="e.g. Hackathon 2026 — Finalists"
+              aria-invalid={!!errors.name}
+              className="mt-1.5 h-9 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-[15px] font-semibold shadow-none focus-visible:border-ring focus-visible:ring-0"
             />
             {errors.name && (
-              <p className="text-destructive text-xs">{errors.name.message}</p>
+              <p className="mt-1 text-[12px] text-destructive">
+                {errors.name.message}
+              </p>
             )}
           </div>
-          <Input
-            {...register("description")}
-            placeholder="Description (optional)"
-            className="text-sm border-0 shadow-none px-0 focus-visible:ring-0 bg-transparent text-muted-foreground w-64"
-          />
+
+          <div className="min-w-0 flex-1">
+            <label htmlFor="event-description" className="label-mono block">
+              Description
+            </label>
+            <Input
+              id="event-description"
+              {...register("description")}
+              placeholder="Optional — for your own reference"
+              className="mt-1.5 h-9 rounded-none border-0 border-b border-transparent bg-transparent px-0 text-[13px] shadow-none focus-visible:border-ring focus-visible:ring-0"
+            />
+          </div>
         </div>
-        <Button type="submit" disabled={saving || uploading} size="sm">
-          {saving ? "Saving…" : "Save Event"}
+
+        <Button type="submit" disabled={saving || uploading || uploadingFont} size="sm">
+          {saving ? "Saving…" : "Save event"}
         </Button>
       </div>
 
-      {/* ── Main split ──────────────────────────────────────────────────────── */}
-      <div className="flex gap-0 border rounded-xl overflow-hidden bg-muted/20 min-h-[540px]">
-
-        {/* ── Left: Canvas area ─────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col min-w-0 p-4 gap-3">
-          {/* Template upload row */}
-          <div className="flex items-center gap-3">
+      {/* ── Editor split ────────────────────────────────────────────────────── */}
+      <div className="flex min-h-[540px] overflow-hidden rounded-lg border border-border">
+        {/* ── Left: canvas ──────────────────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-1 flex-col gap-3 bg-surface-raised p-4">
+          <div className="flex flex-wrap items-center gap-3">
             <label className="cursor-pointer">
-              <span className="inline-flex items-center gap-1.5 text-xs border rounded-md px-3 py-1.5 bg-background hover:bg-muted transition-colors">
-                {uploading ? "Uploading…" : templateDisplayUrl ? "Replace template" : "Upload template"}
+              <span className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[13px] font-medium transition-colors duration-150 hover:border-hair-hover hover:bg-surface-raised">
+                {uploading
+                  ? "Uploading…"
+                  : templateDisplayUrl
+                    ? "Replace template"
+                    : "Upload template"}
               </span>
               <input
                 type="file"
@@ -286,19 +538,20 @@ export function EventForm({ initial, onSave, saving }: Props) {
                 disabled={uploading}
               />
             </label>
+
             {templateNW > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {templateNW} × {templateNH}px
+              <span className="font-mono text-[12px] text-muted-foreground tabular">
+                {templateNW} × {templateNH}
               </span>
             )}
+
             {posX > 0 && posY > 0 && (
-              <span className="text-xs text-muted-foreground ml-auto">
-                Position: ({posX}, {posY})
+              <span className="ml-auto font-mono text-[12px] text-muted-foreground tabular">
+                x {posX} · y {posY}
               </span>
             )}
           </div>
 
-          {/* Canvas */}
           <CertCanvas
             templateUrl={templateDisplayUrl}
             naturalWidth={templateNW}
@@ -308,184 +561,235 @@ export function EventForm({ initial, onSave, saving }: Props) {
             fontSize={formValues.font_size}
             fontStyle={formValues.font_style}
             fontColor={formValues.font_color}
-            fontFamily="system-ui, sans-serif"
+            fontFamily={fontFamily}
+            maxTextWidth={formValues.max_text_width}
             sampleText={sampleText}
             onPositionChange={(x, y) => {
               setPosX(x);
               setPosY(y);
             }}
           />
+
+          <p className="max-w-[70ch] text-[12px] leading-relaxed text-muted-foreground">
+            Click the template to place the name — or tab to it and nudge with
+            the arrow keys. Hold Shift for 10px steps.
+          </p>
+
+          {fontFaceError && (
+            <p role="alert" className="text-[12px] leading-relaxed text-rose-ink">
+              {fontFaceError} The canvas is showing a fallback face
+              {fontSelection?.label ? `; the certificate still uses ${fontSelection.label}` : ""}.
+            </p>
+          )}
+
+          {/* The canvas is the browser's text engine and the PDF is Pillow's.
+              They cannot be made to agree glyph for glyph, so the honest move
+              is to offer the real render rather than claim the canvas is
+              exact. Mounted only once there is something to render, so opening
+              the disclosure is never a dead end. */}
+          {templatePath && posX > 0 && posY > 0 && (
+            <details className="group">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] text-muted-foreground uppercase transition-colors duration-150 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                <span aria-hidden className="transition-transform duration-200 group-open:rotate-90">
+                  ▸
+                </span>
+                Check exact output
+              </summary>
+              <div className="mt-3">
+                <CertPreview
+                  params={{
+                    template_path: templatePath,
+                    text_position_x: posX,
+                    text_position_y: posY,
+                    font_path: fontSelection?.path,
+                    font_size: formValues.font_size,
+                    font_style: formValues.font_style,
+                    font_color: formValues.font_color,
+                    max_text_width: formValues.max_text_width,
+                    sample_name: sampleText,
+                  }}
+                />
+              </div>
+            </details>
+          )}
         </div>
 
-        {/* ── Right: Property sidebar ───────────────────────────────────────── */}
-        <div className="w-64 shrink-0 border-l flex flex-col bg-background">
-
-          <div className="px-4 py-2.5 border-b">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Text & Style</p>
+        {/* ── Right: properties ─────────────────────────────────────────────── */}
+        <div className="flex w-64 shrink-0 flex-col border-l border-border bg-card">
+          <div className="border-b border-border px-4 py-2.5">
+            <p className="label-mono">Text &amp; style</p>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-5">
-            <>
-                {/* Sample text (what shows in canvas preview) */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Preview name
-                  </Label>
-                  <Input
-                    value={sampleText}
-                    onChange={(e) => setSampleText(e.target.value)}
-                    placeholder="Sample Name"
-                    className="text-sm h-8"
-                  />
-                </div>
+          <div className="flex-1 space-y-5 overflow-y-auto p-4">
+            {/* Preview name */}
+            <div className="space-y-1.5">
+              <label htmlFor="sample-text" className="label-mono block">
+                Preview name
+              </label>
+              <Input
+                id="sample-text"
+                value={sampleText}
+                onChange={(e) => setSampleText(e.target.value)}
+                placeholder="Sample Name"
+                className="h-8 text-[13px]"
+              />
+            </div>
 
-                <Separator />
+            <Separator />
 
-                {/* Font size */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Size
-                  </Label>
-                  <div className="flex gap-2 items-center">
-                    <Input
-                      type="number"
-                      {...register("font_size")}
-                      min={8}
-                      max={300}
-                      className="h-8 text-sm w-20"
-                    />
-                    <span className="text-xs text-muted-foreground">px</span>
-                    {/* Quick size presets */}
-                    <div className="flex gap-1 ml-auto">
-                      {[24, 36, 48, 64].map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setValue("font_size", s)}
-                          className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
-                            formValues.font_size === s
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "border-border hover:bg-muted"
-                          }`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+            {/* Font — placed first, because the chosen family governs what the
+                size and style controls below can actually offer. */}
+            <div className="space-y-1.5">
+              <span className="label-mono block">Font</span>
+              <FontPicker
+                catalog={catalog ?? []}
+                value={fontSelection}
+                onChange={setFontSelection}
+                onUpload={handleFontUpload}
+                uploading={uploadingFont}
+                uploadError={fontUploadError}
+              />
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                Bundled with the app — the preview and the certificate render
+                from the same file, and no font is fetched while sending.
+              </p>
+            </div>
 
-                {/* Font style */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Style
-                  </Label>
-                  <div className="flex gap-1.5">
-                    {(["normal", "bold", "italic"] as const).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setValue("font_style", s)}
-                        className={`flex-1 h-8 text-xs border rounded transition-colors capitalize ${
-                          s === "bold" ? "font-bold" : ""
-                        } ${s === "italic" ? "italic" : ""} ${
-                          formValues.font_style === s
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "border-border hover:bg-muted"
-                        }`}
-                      >
-                        {s === "normal" ? "Aa" : s === "bold" ? "B" : "I"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <Separator />
 
-                {/* Font color */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Color
-                  </Label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="color"
-                      {...register("font_color")}
-                      className="w-8 h-8 rounded border cursor-pointer p-0.5 shrink-0"
-                    />
-                    <Input
-                      {...register("font_color")}
-                      className="font-mono text-xs h-8 flex-1"
-                      placeholder="#000000"
-                    />
-                  </div>
-                  {/* Preset swatches */}
-                  <div className="flex gap-1.5 flex-wrap pt-1">
-                    {["#000000", "#ffffff", "#1a1a2e", "#c8a96e", "#2c3e50", "#e74c3c"].map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setValue("font_color", c)}
-                        className="w-6 h-6 rounded border-2 border-border hover:scale-110 transition-transform"
-                        style={{ backgroundColor: c }}
-                        title={c}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Max text width */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Max width
-                  </Label>
-                  <div className="flex gap-2 items-center">
-                    <Input
-                      type="number"
-                      {...register("max_text_width")}
-                      min={100}
-                      className="h-8 text-sm w-24"
-                    />
-                    <span className="text-xs text-muted-foreground">px</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    Font auto-shrinks if the name exceeds this width
-                  </p>
-                </div>
-
-                <Separator />
-
-                {/* Custom font upload */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Custom font
-                  </Label>
-                  <label className="cursor-pointer block">
-                    <span className="inline-flex items-center text-xs border rounded-md px-2.5 py-1.5 bg-background hover:bg-muted transition-colors w-full justify-center">
-                      {fontPath ? fontPath.split("/").pop() : "Upload OTF / TTF"}
-                    </span>
-                    <input
-                      type="file"
-                      accept=".otf,.ttf"
-                      className="hidden"
-                      onChange={handleFontUpload}
-                      disabled={uploading}
-                    />
-                  </label>
-                  {fontPath && (
+            {/* Font size */}
+            <div className="space-y-2">
+              <label htmlFor="font-size" className="label-mono block">
+                Size
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="font-size"
+                  type="number"
+                  {...register("font_size")}
+                  min={8}
+                  max={300}
+                  className="h-8 w-16 text-[13px] tabular"
+                />
+                <span className="text-[12px] text-muted-foreground">px</span>
+                <div className="ml-auto flex gap-1">
+                  {SIZE_PRESETS.map((s) => (
                     <button
+                      key={s}
                       type="button"
-                      onClick={() => setFontPath("")}
-                      className="text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => setValue("font_size", s)}
+                      className={`h-7 w-8 rounded-[3px] border font-mono text-[11px] tabular transition-colors duration-150 ${
+                        formValues.font_size === s
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-muted-foreground hover:border-hair-hover hover:text-foreground"
+                      }`}
                     >
-                      Remove custom font
+                      {s}
                     </button>
-                  )}
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    Preview uses system font; actual cert uses uploaded font
-                  </p>
+                  ))}
                 </div>
-            </>
+              </div>
+            </div>
+
+            {/* Font style */}
+            <div className="space-y-2">
+              <span className="label-mono block">Style</span>
+              <div
+                role="group"
+                aria-label="Font style"
+                className="flex gap-1.5"
+              >
+                {ALL_STYLES.map((s) => {
+                  // Disabled rather than hidden: the style exists as a concept
+                  // and the user should see that this family simply ships one
+                  // weight, not wonder where the button went.
+                  const available = styleAvailable(
+                    fontSelection?.styles ?? ["normal", "bold", "italic"],
+                    s
+                  );
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={!available}
+                      aria-pressed={formValues.font_style === s}
+                      onClick={() => setValue("font_style", s)}
+                      title={
+                        available
+                          ? s
+                          : `${fontSelection?.label ?? "This font"} has no ${s} face`
+                      }
+                      className={`h-8 flex-1 rounded-[3px] border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-35 ${
+                        s === "italic" ? "italic" : ""
+                      } ${s === "bold" ? "font-bold" : ""} ${
+                        formValues.font_style === s
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-muted-foreground hover:border-hair-hover hover:text-foreground"
+                      }`}
+                    >
+                      {s === "normal" ? "Aa" : s === "bold" ? "B" : "I"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Font color */}
+            <div className="space-y-2">
+              <label htmlFor="font-color" className="label-mono block">
+                Color
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  {...register("font_color")}
+                  aria-label="Font colour picker"
+                  className="size-8 shrink-0 cursor-pointer rounded-[3px] border border-border bg-card p-0.5"
+                />
+                <Input
+                  id="font-color"
+                  {...register("font_color")}
+                  placeholder="#000000"
+                  className="h-8 flex-1 font-mono text-[12px]"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {COLOR_PRESETS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setValue("font_color", c)}
+                    title={c}
+                    className="size-6 rounded-[3px] border border-border transition-shadow duration-150 hover:ring-2 hover:ring-ring hover:ring-offset-1 hover:ring-offset-card"
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Max text width */}
+            <div className="space-y-1.5">
+              <label htmlFor="max-text-width" className="label-mono block">
+                Max width
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="max-text-width"
+                  type="number"
+                  {...register("max_text_width")}
+                  min={100}
+                  className="h-8 w-24 text-[13px] tabular"
+                />
+                <span className="text-[12px] text-muted-foreground">px</span>
+              </div>
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                The name auto-shrinks past this width, so long names stay inside
+                the frame.
+              </p>
+            </div>
+
           </div>
         </div>
       </div>

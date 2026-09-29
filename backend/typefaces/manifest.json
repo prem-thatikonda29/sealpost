@@ -1,0 +1,142 @@
+[
+  {
+    "id": "playfair-display",
+    "label": "Playfair Display",
+    "category": "Serif",
+    "google_family": "Playfair Display",
+    "path": "backend/typefaces/playfair-display/PlayfairDisplay.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "merriweather",
+    "label": "Merriweather",
+    "category": "Serif",
+    "google_family": "Merriweather",
+    "path": "backend/typefaces/merriweather/Merriweather.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "lora",
+    "label": "Lora",
+    "category": "Serif",
+    "google_family": "Lora",
+    "path": "backend/typefaces/lora/Lora.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "eb-garamond",
+    "label": "EB Garamond",
+    "category": "Serif",
+    "google_family": "EB Garamond",
+    "path": "backend/typefaces/eb-garamond/EBGaramond.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "libre-baskerville",
+    "label": "Libre Baskerville",
+    "category": "Serif",
+    "google_family": "Libre Baskerville",
+    "path": "backend/typefaces/libre-baskerville/LibreBaskerville.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "cormorant-garamond",
+    "label": "Cormorant Garamond",
+    "category": "Serif",
+    "google_family": "Cormorant Garamond",
+    "path": "backend/typefaces/cormorant-garamond/CormorantGaramond.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "inter",
+    "label": "Inter",
+    "category": "Sans",
+    "google_family": "Inter",
+    "path": "backend/typefaces/inter/Inter.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "roboto",
+    "label": "Roboto",
+    "category": "Sans",
+    "google_family": "Roboto",
+    "path": "backend/typefaces/roboto/Roboto.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "lato",
+    "label": "Lato",
+    "category": "Sans",
+    "google_family": "Lato",
+    "path": "backend/typefaces/lato/Lato.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "montserrat",
+    "label": "Montserrat",
+    "category": "Sans",
+    "google_family": "Montserrat",
+    "path": "backend/typefaces/montserrat/Montserrat.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "open-sans",
+    "label": "Open Sans",
+    "category": "Sans",
+    "google_family": "Open Sans",
+    "path": "backend/typefaces/open-sans/OpenSans.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "source-sans-3",
+    "label": "Source Sans 3",
+    "category": "Sans",
+    "google_family": "Source Sans 3",
+    "path": "backend/typefaces/source-sans-3/SourceSans3.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "oswald",
+    "label": "Oswald",
+    "category": "Display",
+    "google_family": "Oswald",
+    "path": "backend/typefaces/oswald/Oswald.ttf",
+    "has_bold": true,
+    "has_italic": false,
+    "license": "OFL-1.1"
+  },
+  {
+    "id": "josefin-sans",
+    "label": "Josefin Sans",
+    "category": "Display",
+    "google_family": "Josefin Sans",
+    "path": "backend/typefaces/josefin-sans/JosefinSans.ttf",
+    "has_bold": true,
+    "has_italic": true,
+    "license": "OFL-1.1"
+  }
+]

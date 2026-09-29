@@ -12,27 +12,42 @@ const links = [
 
 export function Nav() {
   const pathname = usePathname();
+
   return (
-    <header className="border-b bg-background sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-6">
-        <Link href="/events" className="font-semibold text-sm tracking-tight">
-          Cert Sender
+    <header className="sticky top-0 z-30 border-b border-border bg-canvas/92 backdrop-blur-sm">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
+        <Link
+          href="/events"
+          className="font-serif text-base tracking-[-0.02em] text-foreground shrink-0"
+        >
+          cert-sender
         </Link>
-        <nav className="flex items-center gap-1">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-sm transition-colors",
-                pathname.startsWith(l.href)
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-              )}
-            >
-              {l.label}
-            </Link>
-          ))}
+
+        <nav className="flex items-center gap-1" aria-label="Sections">
+          {links.map((l) => {
+            const active = pathname.startsWith(l.href);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative px-2.5 py-1.5 text-[13px] transition-colors duration-150",
+                  active
+                    ? "text-foreground font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {l.label}
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-2 -bottom-[9px] h-px bg-foreground"
+                  />
+                )}
+              </Link>
+            );
+          })}
         </nav>
       </div>
     </header>

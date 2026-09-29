@@ -51,9 +51,30 @@ export interface Job {
 
 export interface TemplateUpload {
   template_id: string;
+  path: string;
   url: string;
   natural_width: number;
   natural_height: number;
+}
+
+export interface FontEntry {
+  id: string;
+  label: string;
+  category: string;
+  path: string;
+  /** Absolute — the API returns a path and this layer makes it a URL. */
+  url: string;
+  /** Which of normal / bold / italic this family has real files for. */
+  styles: string[];
+  google_family: string;
+}
+
+export interface FontUpload {
+  font_id: string;
+  path: string;
+  url: string;
+  family: string;
+  style: string;
 }
 
 export interface EmailValidation {
@@ -93,22 +114,38 @@ export const templateUrl = (path: string) => {
   return `${BASE}/api/templates/${id}`;
 };
 
-// ─── Preview ──────────────────────────────────────────────────────────────────
+// ─── Fonts ────────────────────────────────────────────────────────────────────
 
-export const getPreviewUrl = (params: {
-  template_path: string;
-  text_position_x: number;
-  text_position_y: number;
-  font_path?: string;
-  font_size: number;
-  font_style: string;
-  font_color: string;
-  max_text_width: number;
-  sample_name?: string;
-}): string => {
-  // Returns a URL we can POST to — used by CertPreview via fetch
-  return `${BASE}/api/preview`;
+export const listFonts = () =>
+  api
+    .get<FontEntry[]>("/api/fonts")
+    .then((r) => r.data.map((f) => ({ ...f, url: `${BASE}${f.url}` })));
+
+export const uploadFont = (file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+  return api
+    .post<FontUpload>("/api/fonts/upload", form)
+    .then((r) => ({ ...r.data, url: `${BASE}${r.data.url}` }));
 };
+
+/**
+ * The URL for a stored font_path.
+ *
+ * Catalog fonts are stored as their repo-relative path and resolved through the
+ * catalog; uploaded fonts are stored as `uploads/fonts/<uuid>_<name>` and
+ * resolved by the UUID, which both serving routes accept as `font_id`.
+ */
+export const fontFileUrl = (path: string, catalog: FontEntry[]): string => {
+  if (!path) return "";
+  if (path.startsWith("uploads/")) {
+    const filename = path.split("/").pop() ?? "";
+    return filename.length >= 36 ? `${BASE}/api/fonts/${filename.slice(0, 36)}/file` : "";
+  }
+  return catalog.find((f) => f.path === path)?.url ?? "";
+};
+
+// ─── Preview ──────────────────────────────────────────────────────────────────
 
 export const fetchPreview = async (params: {
   template_path: string;

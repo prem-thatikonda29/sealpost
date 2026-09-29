@@ -41,52 +41,53 @@ export function PositionEditor({
     onChange(ox, oy);
   };
 
-  // Position of the crosshair in display pixels
-  const crossX = naturalWidth ? (value.x / naturalWidth) * imgSize.w : 0;
-  const crossY = naturalHeight ? (value.y / naturalHeight) * imgSize.h : 0;
+  // Position of the marker in display pixels
+  const markX = naturalWidth ? (value.x / naturalWidth) * imgSize.w : 0;
+  const markY = naturalHeight ? (value.y / naturalHeight) * imgSize.h : 0;
+
+  const hasPosition = value.x > 0 && value.y > 0;
 
   return (
     <div className="relative inline-block max-w-full" style={{ maxWidth: 900 }}>
-      {/* Template image */}
       <img
         ref={imgRef}
         src={templateUrl}
         alt="Certificate template"
-        className="block w-full select-none"
+        className="block w-full select-none rounded-lg border border-border"
         draggable={false}
       />
 
-      {/* Click overlay */}
-      <div
-        className="absolute inset-0 cursor-crosshair"
-        onClick={handleClick}
-      />
+      {/* Click target */}
+      <div className="absolute inset-0 cursor-crosshair" onClick={handleClick} />
 
-      {/* Crosshair marker at current position */}
-      {value.x > 0 && value.y > 0 && imgSize.w > 0 && (
+      {/* Placement marker */}
+      {hasPosition && imgSize.w > 0 && (
         <div
-          className="absolute pointer-events-none"
+          className="pointer-events-none absolute"
           style={{
-            left: crossX,
-            top: crossY,
+            left: markX,
+            top: markY,
             transform: "translate(-50%, -50%)",
           }}
         >
-          {/* Horizontal bar */}
-          <div className="absolute bg-red-500 opacity-90"
-            style={{ width: 24, height: 2, top: -1, left: -12 }} />
-          {/* Vertical bar */}
-          <div className="absolute bg-red-500 opacity-90"
-            style={{ width: 2, height: 24, top: -12, left: -1 }} />
-          {/* Centre dot */}
-          <div className="absolute bg-red-500 rounded-full"
-            style={{ width: 6, height: 6, top: -3, left: -3 }} />
+          <div
+            className="absolute bg-terra-ink"
+            style={{ width: 24, height: 1, top: 0, left: -12 }}
+          />
+          <div
+            className="absolute bg-terra-ink"
+            style={{ width: 1, height: 24, top: -12, left: 0 }}
+          />
+          <div
+            className="absolute rounded-full border border-canvas bg-terra-ink"
+            style={{ width: 6, height: 6, top: -3, left: -3 }}
+          />
         </div>
       )}
 
-      {/* Coordinate hint */}
-      {value.x > 0 && value.y > 0 && (
-        <span className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded pointer-events-none">
+      {/* Coordinate readout */}
+      {hasPosition && (
+        <span className="pointer-events-none absolute right-2 bottom-2 rounded-[3px] bg-ink/75 px-2 py-0.5 font-mono text-[11px] text-canvas tabular">
           {value.x}, {value.y}
         </span>
       )}

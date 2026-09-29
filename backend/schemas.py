@@ -113,6 +113,7 @@ class JobListItem(BaseModel):
 
 class TemplateUploadResponse(BaseModel):
     template_id: str
+    path: str          # repo-relative, e.g. uploads/<uuid>_cert.png — store this
     url: str
     natural_width: int
     natural_height: int

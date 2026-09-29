@@ -12,6 +12,8 @@ from typing import Optional, Tuple
 import img2pdf
 from PIL import Image, ImageDraw, ImageFont
 
+from .paths import resolve
+
 # Fallback system font path (macOS + common Linux locations)
 _FALLBACK_FONTS = [
     "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -45,6 +47,23 @@ def get_first_name(full_name: str) -> str:
     return parts[0] if parts else full_name
 
 
+def validate_inputs(template_path: Optional[str], font_path: Optional[str]) -> None:
+    """
+    Check that a job could actually render, before it starts.
+
+    job_runner catches per-row exceptions and marks the row failed, so a
+    missing template or font does not crash a job — it marks *every* row failed
+    while the job runs to completion, which reads as a mail problem rather than
+    a missing file. Fail once, up front, with the reason.
+    """
+    if not template_path:
+        raise ValueError("This event has no template. Upload one in the editor.")
+    if not resolve(template_path).exists():
+        raise ValueError(f"Template file is missing: {template_path}")
+    if font_path:
+        _load_font(font_path, "normal", 12)  # raises FileNotFoundError
+
+
 def _parse_color(hex_color: str) -> Tuple[int, int, int]:
     """Convert CSS hex (#RRGGBB or #RGB) to an RGB tuple."""
     h = hex_color.lstrip("#")
@@ -63,7 +82,7 @@ def _load_font(
     If font_style is 'bold' or 'italic' and a matching variant exists next to
     the regular font, use it; otherwise fall back gracefully.
     """
-    resolved = font_path or _resolve_fallback_font()
+    resolved = str(resolve(font_path)) if font_path else _resolve_fallback_font()
 
     if font_style in ("bold", "italic", "bold_italic"):
         base_dir = os.path.dirname(resolved)
@@ -80,9 +99,71 @@ def _load_font(
             if os.path.exists(candidate):
                 resolved = candidate
                 break
-        # If no variant found, just use the regular weight silently
+        # If no variant found, just use the regular weight silently.
+        # Callers that need to know this call available_styles() first.
 
-    return ImageFont.truetype(resolved, font_size)
+    # Pillow's own error for a missing file names a file descriptor, not the
+    # path, which is unreadable in a job's failure log.
+    if not os.path.exists(resolved):
+        raise FileNotFoundError(
+            f"Font file not found: {resolved}. Re-upload the font, or pick one "
+            f"from the built-in library."
+        )
+
+    try:
+        return ImageFont.truetype(resolved, font_size)
+    except OSError as exc:
+        raise FileNotFoundError(f"Cannot read font {resolved}: {exc}") from exc
+
+
+def available_styles(font_path: Optional[str]) -> list[str]:
+    """
+    Which of normal / bold / italic this font can actually render.
+
+    The sibling-probe in _load_font falls back to the regular weight silently,
+    so "bold" on a single-file font produces a regular certificate. The UI uses
+    this to only offer styles that resolve to a real face.
+    """
+    if not font_path:
+        return ["normal"]
+
+    resolved = str(resolve(font_path))
+    base_dir = os.path.dirname(resolved)
+    base_name = os.path.splitext(os.path.basename(resolved))[0]
+    ext = os.path.splitext(resolved)[1]
+
+    styles = ["normal"]
+    for key, suffixes in (
+        ("bold", ["-Bold", "_Bold", "Bold", "-bold", "_bold"]),
+        ("italic", ["-Italic", "_Italic", "Italic", "-italic", "_italic"]),
+    ):
+        if any(os.path.exists(os.path.join(base_dir, f"{base_name}{s}{ext}")) for s in suffixes):
+            styles.append(key)
+    return styles
+
+
+def _draw_name(
+    img: Image.Image,
+    name: str,
+    position: Tuple[int, int],
+    font: ImageFont.FreeTypeFont,
+    font_color: str,
+) -> None:
+    """
+    Draw `name` centred on `position`.
+
+    anchor="mm" centres the run on its advance width and on the font's
+    ascent/descent midline. The previous code centred the *ink* box
+    (bbox[2]-bbox[0], bbox[3]-bbox[1]) but drew with the default "la" anchor,
+    which aligns the ascender top — so ink landed low by bbox[1] / 2. That
+    offset is font-dependent (measured ~11px for Inter at size 48, 0px for
+    Press Start 2P), so no constant could correct it. "mm" is also what CSS
+    `translate(-50%, -50%)` on a line box approximates, which is what the
+    editor's canvas preview does.
+    """
+    ImageDraw.Draw(img).text(
+        position, name, font=font, fill=_parse_color(font_color), anchor="mm"
+    )
 
 
 def fit_font(
@@ -125,19 +206,10 @@ def generate_certificate(
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
-    img = Image.open(template_path).convert("RGBA")
+    img = Image.open(resolve(template_path)).convert("RGBA")
 
     font = fit_font(name, font_size, max_text_width, font_path, font_style)
-    bbox = font.getbbox(name)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-
-    cx, cy = text_position
-    text_x = cx - text_w // 2
-    text_y = cy - text_h // 2
-
-    fill_color = _parse_color(font_color)
-    ImageDraw.Draw(img).text((text_x, text_y), name, font=font, fill=fill_color)
+    _draw_name(img, name, text_position, font, font_color)
 
     rgb = img.convert("RGB")
 
@@ -170,19 +242,10 @@ def generate_preview_png(
     Same as generate_certificate but returns a temp PNG path (not a PDF).
     Caller is responsible for deleting the file after streaming it.
     """
-    img = Image.open(template_path).convert("RGBA")
+    img = Image.open(resolve(template_path)).convert("RGBA")
 
     font = fit_font(name, font_size, max_text_width, font_path, font_style)
-    bbox = font.getbbox(name)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-
-    cx, cy = text_position
-    text_x = cx - text_w // 2
-    text_y = cy - text_h // 2
-
-    fill_color = _parse_color(font_color)
-    ImageDraw.Draw(img).text((text_x, text_y), name, font=font, fill=fill_color)
+    _draw_name(img, name, text_position, font, font_color)
 
     rgb = img.convert("RGB")
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:

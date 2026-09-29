@@ -6,13 +6,12 @@ import { getEvents, createJob, type Event } from "@/lib/api";
 import { CsvUploader, type CsvRow } from "@/components/CsvUploader";
 import { JobProgress } from "@/components/JobProgress";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 
 interface TierJob {
   jobId: string;
@@ -25,7 +24,6 @@ interface TierSetup {
   checked: boolean;
   csvFile: File | null;
   csvRows: CsvRow[] | null;
-  // Email content for this run — editable before starting
   emailSubject: string;
   emailBody: string;
 }
@@ -35,6 +33,7 @@ function RunPageInner() {
   const preselect = searchParams.get("event");
 
   const [tiers, setTiers] = useState<TierSetup[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [dryRun, setDryRun] = useState(false);
   const [batchSize, setBatchSize] = useState(0);
   const [runningJobs, setRunningJobs] = useState<TierJob[] | null>(null);
@@ -42,18 +41,21 @@ function RunPageInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getEvents().then((evs) => {
-      setTiers(
-        evs.map((ev) => ({
-          event: ev,
-          checked: preselect ? ev.id === preselect : false,
-          csvFile: null,
-          csvRows: null,
-          emailSubject: "",
-          emailBody: "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards",
-        }))
-      );
-    });
+    getEvents()
+      .then((evs) => {
+        setTiers(
+          evs.map((ev) => ({
+            event: ev,
+            checked: preselect ? ev.id === preselect : false,
+            csvFile: null,
+            csvRows: null,
+            emailSubject: "",
+            emailBody:
+              "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards",
+          }))
+        );
+      })
+      .finally(() => setLoaded(true));
   }, [preselect]);
 
   const toggleTier = (id: string) =>
@@ -68,7 +70,11 @@ function RunPageInner() {
       )
     );
 
-  const setField = (id: string, field: "emailSubject" | "emailBody", value: string) =>
+  const setField = (
+    id: string,
+    field: "emailSubject" | "emailBody",
+    value: string
+  ) =>
     setTiers((prev) =>
       prev.map((t) => (t.event.id === id ? { ...t, [field]: value } : t))
     );
@@ -110,183 +116,245 @@ function RunPageInner() {
   // ── Running view ────────────────────────────────────────────────────────────
   if (runningJobs) {
     return (
-      <div className="space-y-6 max-w-2xl">
-        <div>
-          <h1 className="text-xl font-semibold">Running</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {runningJobs.length} tier{runningJobs.length > 1 ? "s" : ""} in progress
-          </p>
+      <div className="max-w-2xl space-y-6">
+        <PageHeader
+          title="Running"
+          subtitle={`${runningJobs.length} tier${runningJobs.length > 1 ? "s" : ""} in progress`}
+        />
+        <div className="space-y-4">
+          {runningJobs.map((job) => (
+            <div
+              key={job.jobId}
+              className="overflow-hidden rounded-lg border border-border"
+            >
+              <div className="border-b border-border px-4 py-2.5">
+                <h2 className="text-sm font-semibold">{job.eventName}</h2>
+              </div>
+              <div className="p-4">
+                <JobProgress jobId={job.jobId} total={job.total} />
+              </div>
+            </div>
+          ))}
         </div>
-        {runningJobs.map((job) => (
-          <Card key={job.jobId}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{job.eventName}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <JobProgress jobId={job.jobId} total={job.total} />
-            </CardContent>
-          </Card>
-        ))}
+      </div>
+    );
+  }
+
+  // ── Loading ─────────────────────────────────────────────────────────────────
+  if (!loaded) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <PageHeader title="Run" subtitle="Check the tiers you want to run" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   // ── Setup view ──────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-semibold">Run</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Check the tiers you want to run, upload their CSVs, then start
-        </p>
-      </div>
+    <div className="max-w-2xl space-y-6">
+      <PageHeader
+        title="Run"
+        subtitle="Check the tiers you want to run, upload their CSVs, then start"
+      />
 
-      {tiers.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          No events found.{" "}
-          <a href="/events/new" className="underline">
-            Create an event first.
+      {tiers.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-hair-hover px-6 py-16 text-center">
+          <p className="font-serif text-lg tracking-[-0.02em] text-foreground">
+            No events to run
+          </p>
+          <p className="measure mx-auto mt-2 text-[13px] leading-relaxed text-muted-foreground">
+            A run needs at least one event — that&apos;s what supplies the
+            template and the name placement. Create one, then come back here to
+            attach a participant CSV.
+          </p>
+          <a href="/events/new" className="mt-5 inline-block">
+            <Button>Create an event</Button>
           </a>
-        </p>
-      )}
+        </div>
+      ) : (
+        <>
+          {/* Tier checklist */}
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            {tiers.map((tier) => {
+              const blocked =
+                !tier.event.template_path || !tier.event.text_position_x;
+              return (
+                <div key={tier.event.id}>
+                  <div className="flex items-center gap-3 p-4">
+                    <Checkbox
+                      id={`tier-${tier.event.id}`}
+                      checked={tier.checked}
+                      onCheckedChange={() => toggleTier(tier.event.id)}
+                    />
+                    <label
+                      htmlFor={`tier-${tier.event.id}`}
+                      className="cursor-pointer text-sm font-semibold select-none"
+                    >
+                      {tier.event.name}
+                    </label>
 
-      {/* Tier checklist */}
-      <div className="space-y-3">
-        {tiers.map((tier) => (
-          <Card
-            key={tier.event.id}
-            className={tier.checked ? "border-primary/50 bg-primary/5" : ""}
-          >
-            <CardContent className="pt-4 pb-4 space-y-4">
-              {/* Row: checkbox + name + status badges */}
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id={`tier-${tier.event.id}`}
-                  checked={tier.checked}
-                  onCheckedChange={() => toggleTier(tier.event.id)}
-                />
-                <label
-                  htmlFor={`tier-${tier.event.id}`}
-                  className="font-medium text-sm cursor-pointer select-none"
-                >
-                  {tier.event.name}
-                </label>
-                <div className="ml-auto flex gap-1.5 flex-wrap justify-end">
-                  {!tier.event.template_path && (
-                    <Badge variant="outline" className="text-yellow-700 border-yellow-400 bg-yellow-50 text-xs">
-                      No template
-                    </Badge>
-                  )}
-                  {!tier.event.text_position_x && (
-                    <Badge variant="outline" className="text-yellow-700 border-yellow-400 bg-yellow-50 text-xs">
-                      No position
-                    </Badge>
-                  )}
-                  {tier.csvRows && (
-                    <Badge variant="outline" className="text-green-700 border-green-400 bg-green-50 text-xs">
-                      {tier.csvRows.length} rows loaded
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Expanded section when checked */}
-              {tier.checked && (
-                <div className="pl-7 space-y-4">
-                  {/* CSV upload */}
-                  <CsvUploader
-                    onReady={(rows, file) => setCsv(tier.event.id, rows, file)}
-                  />
-
-                  {/* Per-tier email settings */}
-                  <div className="space-y-3 rounded-md border p-4 bg-background">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Email for this tier
-                    </p>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Subject</Label>
-                      <Input
-                        value={tier.emailSubject}
-                        onChange={(e) =>
-                          setField(tier.event.id, "emailSubject", e.target.value)
-                        }
-                        placeholder="Your Certificate — Event Name"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">
-                        Body{" "}
-                        <span className="text-muted-foreground font-normal">
-                          — use {"{name}"} for recipient&apos;s first name
-                        </span>
-                      </Label>
-                      <Textarea
-                        value={tier.emailBody}
-                        onChange={(e) =>
-                          setField(tier.event.id, "emailBody", e.target.value)
-                        }
-                        rows={4}
-                        placeholder={"Hi {name},\n\nPlease find your certificate attached."}
-                      />
+                    <div className="ml-auto flex flex-wrap justify-end gap-1.5">
+                      {!tier.event.template_path && (
+                        <Badge variant="warn">No template</Badge>
+                      )}
+                      {!tier.event.text_position_x && (
+                        <Badge variant="warn">No position</Badge>
+                      )}
+                      {tier.csvRows && (
+                        <Badge variant="ok">
+                          {tier.csvRows.length} rows
+                        </Badge>
+                      )}
                     </div>
                   </div>
+
+                  {/* Disclosure — state change, not decoration */}
+                  {tier.checked && (
+                    <div className="animate-in space-y-5 border-t border-border bg-surface-raised p-4 duration-200 ease-out-quart fade-in-0 slide-in-from-top-1">
+                      {blocked && (
+                        <p className="rounded-md bg-amber px-3 py-2 text-[13px] leading-relaxed text-amber-ink">
+                          This event is missing a template or a name position.
+                          It will fail when the job runs —{" "}
+                          <a
+                            href={`/events/${tier.event.id}`}
+                            className="underline underline-offset-2"
+                          >
+                            fix it in the editor
+                          </a>
+                          .
+                        </p>
+                      )}
+
+                      <CsvUploader
+                        onReady={(rows, file) =>
+                          setCsv(tier.event.id, rows, file)
+                        }
+                      />
+
+                      <div className="space-y-4 border-t border-border pt-5">
+                        <p className="label-mono">Email for this tier</p>
+
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor={`subject-${tier.event.id}`}
+                            className="label-mono block"
+                          >
+                            Subject
+                          </label>
+                          <Input
+                            id={`subject-${tier.event.id}`}
+                            value={tier.emailSubject}
+                            onChange={(e) =>
+                              setField(
+                                tier.event.id,
+                                "emailSubject",
+                                e.target.value
+                              )
+                            }
+                            placeholder="Your Certificate — Event Name"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor={`body-${tier.event.id}`}
+                            className="label-mono block"
+                          >
+                            Body
+                          </label>
+                          <Textarea
+                            id={`body-${tier.event.id}`}
+                            value={tier.emailBody}
+                            onChange={(e) =>
+                              setField(tier.event.id, "emailBody", e.target.value)
+                            }
+                            rows={4}
+                            placeholder={
+                              "Hi {name},\n\nPlease find your certificate attached."
+                            }
+                          />
+                          <p className="text-[12px] leading-relaxed text-muted-foreground">
+                            {"{name}"} becomes the recipient&apos;s first name.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Separator />
-
-      {/* Shared run options */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Run Options</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="dryRun"
-              checked={dryRun}
-              onCheckedChange={(v) => setDryRun(!!v)}
-            />
-            <Label htmlFor="dryRun">
-              Dry run — generate certificates but don&apos;t send emails
-            </Label>
+              );
+            })}
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="batchSize">
-              Batch size{" "}
-              <span className="text-muted-foreground font-normal">(0 = all rows)</span>
-            </Label>
-            <Input
-              id="batchSize"
-              type="number"
-              min={0}
-              value={batchSize}
-              onChange={(e) => setBatchSize(Number(e.target.value))}
-              className="w-32"
-            />
+
+          {/* Shared run options */}
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="border-b border-border px-4 py-2.5">
+              <h2 className="text-sm font-semibold">Run options</h2>
+            </div>
+            <div className="space-y-4 p-4">
+              <div className="flex items-center gap-2.5">
+                <Checkbox
+                  id="dryRun"
+                  checked={dryRun}
+                  onCheckedChange={(v) => setDryRun(!!v)}
+                />
+                <label
+                  htmlFor="dryRun"
+                  className="cursor-pointer text-[13px] select-none"
+                >
+                  Dry run
+                </label>
+                <span className="text-[12px] text-muted-foreground">
+                  — generate the certificates but send nothing
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="batchSize" className="label-mono block">
+                  Batch size
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="batchSize"
+                    type="number"
+                    min={0}
+                    value={batchSize}
+                    onChange={(e) => setBatchSize(Number(e.target.value))}
+                    className="w-28 tabular"
+                  />
+                  <span className="text-[12px] text-muted-foreground">
+                    0 sends everything in one batch
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p
+              role="alert"
+              className="rounded-md bg-rose px-3 py-2 text-[13px] text-rose-ink"
+            >
+              {error}
+            </p>
+          )}
 
-      <Button
-        onClick={handleStart}
-        disabled={!allReady || starting}
-        className="w-full"
-      >
-        {starting
-          ? "Starting…"
-          : selectedTiers.length > 1
-          ? `Start ${selectedTiers.length} tiers`
-          : selectedTiers.length === 1
-          ? `Start — ${selectedTiers[0].event.name}`
-          : "Select at least one tier"}
-      </Button>
+          <Button
+            onClick={handleStart}
+            disabled={!allReady || starting}
+            size="lg"
+            className="w-full"
+          >
+            {starting
+              ? "Starting…"
+              : selectedTiers.length > 1
+                ? `Start ${selectedTiers.length} tiers`
+                : selectedTiers.length === 1
+                  ? `Start — ${selectedTiers[0].event.name}`
+                  : "Select at least one tier"}
+          </Button>
+        </>
+      )}
     </div>
   );
 }

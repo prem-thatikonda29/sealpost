@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createEvent } from "@/lib/api";
 import { EventForm } from "@/components/EventForm";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function NewEventPage() {
   const router = useRouter();
@@ -13,13 +14,11 @@ export default function NewEventPage() {
   };
 
   return (
-    <div>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold">New Event</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Configure a reusable certificate event
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="New Event"
+        subtitle="Configure a reusable certificate event"
+      />
       <EventForm onSave={handleSave} />
     </div>
   );

@@ -3,8 +3,6 @@
 import { useRef, useState } from "react";
 import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -85,151 +83,174 @@ export function CsvUploader({ onReady }: Props) {
   const invalidCount = Object.values(validation).filter((v) => !v.valid).length;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Participants CSV</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* File picker */}
-        <div className="flex gap-2 items-center">
+    <div className="space-y-4">
+      <p className="label-mono">Participants CSV</p>
+
+      {/* File picker */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => inputRef.current?.click()}
+        >
+          {file ? "Change file" : "Choose CSV"}
+        </Button>
+        {file && (
+          <span className="font-mono text-[12px] text-muted-foreground tabular">
+            {file.name} · {rawRows.length} rows
+          </span>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv"
+          className="hidden"
+          onChange={handleFile}
+        />
+      </div>
+
+      {/* Column mapping */}
+      {headers.length > 0 && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label htmlFor="csv-name-col" className="label-mono block">
+              Name column
+            </label>
+            <Select value={nameCol} onValueChange={(v) => setNameCol(v ?? "")}>
+              <SelectTrigger id="csv-name-col">
+                <SelectValue placeholder="Select column" />
+              </SelectTrigger>
+              <SelectContent>
+                {headers.map((h) => (
+                  <SelectItem key={h} value={h}>
+                    {h}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="csv-email-col" className="label-mono block">
+              Email column
+            </label>
+            <Select value={emailCol} onValueChange={(v) => setEmailCol(v ?? "")}>
+              <SelectTrigger id="csv-email-col">
+                <SelectValue placeholder="Select column" />
+              </SelectTrigger>
+              <SelectContent>
+                {headers.map((h) => (
+                  <SelectItem key={h} value={h}>
+                    {h}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      {/* Validation */}
+      {emailCol && rawRows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => inputRef.current?.click()}
+            onClick={handleValidate}
+            disabled={validating}
           >
-            {file ? "Change File" : "Choose CSV"}
+            {validating ? "Checking…" : "Check email domains"}
           </Button>
-          {file && (
-            <span className="text-sm text-muted-foreground">
-              {file.name} — {rawRows.length} rows
-            </span>
+          {invalidCount > 0 && (
+            <Badge variant="warn">
+              {invalidCount} invalid domain{invalidCount > 1 ? "s" : ""}
+            </Badge>
           )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleFile}
-          />
+          {Object.keys(validation).length > 0 && invalidCount === 0 && (
+            <Badge variant="ok">All domains valid</Badge>
+          )}
         </div>
+      )}
 
-        {/* Column mapping */}
-        {headers.length > 0 && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Name Column</Label>
-              <Select value={nameCol} onValueChange={(v) => setNameCol(v ?? "")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select column" />
-                </SelectTrigger>
-                <SelectContent>
-                  {headers.map((h) => (
-                    <SelectItem key={h} value={h}>
-                      {h}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email Column</Label>
-              <Select value={emailCol} onValueChange={(v) => setEmailCol(v ?? "")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select column" />
-                </SelectTrigger>
-                <SelectContent>
-                  {headers.map((h) => (
-                    <SelectItem key={h} value={h}>
-                      {h}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
-
-        {/* Validation */}
-        {emailCol && rawRows.length > 0 && (
-          <div className="flex items-center gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleValidate}
-              disabled={validating}
-            >
-              {validating ? "Checking emails…" : "Validate Emails"}
-            </Button>
-            {invalidCount > 0 && (
-              <Badge variant="outline" className="text-yellow-700 border-yellow-400 bg-yellow-50">
-                ⚠ {invalidCount} invalid domain{invalidCount > 1 ? "s" : ""}
-              </Badge>
-            )}
-            {Object.keys(validation).length > 0 && invalidCount === 0 && (
-              <Badge variant="outline" className="text-green-700 border-green-400 bg-green-50">
-                ✓ All emails look valid
-              </Badge>
-            )}
-          </div>
-        )}
-
-        {/* Preview table */}
-        {rawRows.length > 0 && nameCol && emailCol && (
-          <div className="max-h-52 overflow-y-auto rounded border text-xs">
-            <table className="w-full">
-              <thead className="bg-muted sticky top-0">
-                <tr>
-                  <th className="text-left px-3 py-1.5 font-medium">#</th>
-                  <th className="text-left px-3 py-1.5 font-medium">Name</th>
-                  <th className="text-left px-3 py-1.5 font-medium">Email</th>
-                  <th className="text-left px-3 py-1.5 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rawRows.slice(0, 100).map((row, i) => {
-                  const em = (row[emailCol] ?? "").trim().toLowerCase();
-                  const v = validation[em];
-                  return (
-                    <tr key={i} className="border-t">
-                      <td className="px-3 py-1 text-muted-foreground">{i + 1}</td>
-                      <td className="px-3 py-1">{row[nameCol] ?? ""}</td>
-                      <td className="px-3 py-1 font-mono">{row[emailCol] ?? ""}</td>
-                      <td className="px-3 py-1">
-                        {v ? (
-                          v.valid ? (
-                            <span className="text-green-600">✓</span>
+      {/* Preview */}
+      {rawRows.length > 0 && nameCol && emailCol && (
+        <>
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="max-h-52 overflow-y-auto">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 bg-muted">
+                  <tr className="border-b border-border">
+                    <th className="label-mono w-10 px-3 py-2 text-left font-medium">
+                      #
+                    </th>
+                    <th className="label-mono px-3 py-2 text-left font-medium">
+                      Name
+                    </th>
+                    <th className="label-mono px-3 py-2 text-left font-medium">
+                      Email
+                    </th>
+                    <th className="label-mono px-3 py-2 text-left font-medium">
+                      Domain
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rawRows.slice(0, 100).map((row, i) => {
+                    const em = (row[emailCol] ?? "").trim().toLowerCase();
+                    const v = validation[em];
+                    return (
+                      <tr
+                        key={i}
+                        className="border-b border-border last:border-0"
+                      >
+                        <td className="px-3 py-1.5 font-mono text-[12px] text-muted-foreground tabular">
+                          {i + 1}
+                        </td>
+                        <td className="px-3 py-1.5 text-[13px]">
+                          {row[nameCol] ?? ""}
+                        </td>
+                        <td className="px-3 py-1.5 font-mono text-[12px]">
+                          {row[emailCol] ?? ""}
+                        </td>
+                        <td className="px-3 py-1.5 text-[12px]">
+                          {v ? (
+                            v.valid ? (
+                              <span className="text-sage-ink">Valid</span>
+                            ) : (
+                              <span className="text-amber-ink" title={v.reason}>
+                                {v.reason}
+                              </span>
+                            )
                           ) : (
-                            <span className="text-yellow-600" title={v.reason}>⚠ {v.reason}</span>
-                          )
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {rawRows.length > 100 && (
-              <p className="text-center text-muted-foreground py-2">
-                …and {rawRows.length - 100} more rows
-              </p>
-            )}
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        )}
 
-        {/* Confirm button */}
-        {rawRows.length > 0 && (
+          {rawRows.length > 100 && (
+            <p className="text-[12px] text-muted-foreground">
+              Showing the first 100 of {rawRows.length} rows. All of them will be
+              sent.
+            </p>
+          )}
+
           <Button
             type="button"
             size="sm"
             disabled={!nameCol || !emailCol}
             onClick={handleConfirm}
           >
-            Use this CSV ({rawRows.length} rows)
+            Use this CSV — {rawRows.length} rows
           </Button>
-        )}
-      </CardContent>
-    </Card>
+        </>
+      )}
+    </div>
   );
 }

@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getEvents, deleteEvent, type Event } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -20,7 +21,9 @@ export default function EventsPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete event "${name}"?`)) return;
@@ -30,85 +33,111 @@ export default function EventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Events</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Saved certificate configurations
-          </p>
-        </div>
-        <Link href="/events/new">
-          <Button>+ New Event</Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Events"
+        subtitle="Saved certificate configurations"
+        actions={
+          <Link href="/events/new">
+            <Button>+ New Event</Button>
+          </Link>
+        }
+      />
 
       {loading && (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 hairline-grid">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-3 p-5">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-6 w-24" />
+            </div>
+          ))}
+        </div>
       )}
 
       {!loading && events.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground text-sm">
-            No events yet.{" "}
-            <Link href="/events/new" className="underline">
-              Create your first one.
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border border-dashed border-hair-hover px-6 py-16 text-center">
+          <p className="font-serif text-lg tracking-[-0.02em] text-foreground">
+            No events yet
+          </p>
+          <p className="measure mx-auto mt-2 text-[13px] leading-relaxed text-muted-foreground">
+            An event holds one certificate template and the rules for placing a
+            name on it. Create one per award tier — winners, runners-up,
+            participants — then reuse it for every batch you send.
+          </p>
+          <Link href="/events/new" className="mt-5 inline-block">
+            <Button>Create your first event</Button>
+          </Link>
+        </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {events.map((ev) => (
-          <Card key={ev.id}>
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">{ev.name}</CardTitle>
-                <div className="flex gap-1 shrink-0">
-                  {ev.text_position_x ? (
-                    <Badge variant="outline" className="text-green-700 border-green-400 bg-green-50 text-xs">
-                      Position set
-                    </Badge>
+      {!loading && events.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 hairline-grid">
+          {events.map((ev) => (
+            <div
+              key={ev.id}
+              className="group flex flex-col gap-3 p-5 transition-colors duration-150 hover:bg-surface-raised"
+            >
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold text-foreground">
+                  {ev.name}
+                </h2>
+                {ev.description && (
+                  <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">
+                    {ev.description}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {ev.template_path ? (
+                  ev.text_position_x ? (
+                    <Badge variant="ok">Ready</Badge>
                   ) : (
-                    <Badge variant="outline" className="text-yellow-700 border-yellow-400 bg-yellow-50 text-xs">
-                      No position
-                    </Badge>
-                  )}
-                  {ev.template_path ? null : (
-                    <Badge variant="outline" className="text-yellow-700 border-yellow-400 bg-yellow-50 text-xs">
-                      No template
-                    </Badge>
-                  )}
+                    <Badge variant="warn">No position</Badge>
+                  )
+                ) : (
+                  <Badge variant="warn">No template</Badge>
+                )}
+              </div>
+
+              <dl className="font-mono text-[12px] text-muted-foreground">
+                <div className="flex gap-2">
+                  <dt className="sr-only">Typography</dt>
+                  <dd className="tabular">
+                    {ev.font_size}px · {ev.font_style} · {ev.font_color}
+                  </dd>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {ev.description && (
-                <p className="text-sm text-muted-foreground mb-3">{ev.description}</p>
-              )}
-              <div className="text-xs text-muted-foreground space-y-0.5">
-                <p>Font: {ev.font_size}px · {ev.font_style} · {ev.font_color}</p>
-                <p>Max width: {ev.max_text_width}px</p>
-              </div>
-              <div className="flex gap-2 mt-4">
+                <div className="flex gap-2">
+                  <dt className="sr-only">Max text width</dt>
+                  <dd className="tabular">max {ev.max_text_width}px</dd>
+                </div>
+              </dl>
+
+              <div className="mt-auto flex items-center gap-2 pt-1">
                 <Link href={`/events/${ev.id}`}>
-                  <Button variant="outline" size="sm">Edit</Button>
+                  <Button variant="outline" size="sm">
+                    Edit
+                  </Button>
+                </Link>
+                <Link href={`/run?event=${ev.id}`}>
+                  <Button variant="outline" size="sm">
+                    Run →
+                  </Button>
                 </Link>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-destructive hover:bg-destructive/10"
+                  className="ml-auto text-destructive hover:bg-rose hover:text-rose-ink"
                   onClick={() => handleDelete(ev.id, ev.name)}
                 >
                   Delete
                 </Button>
-                <Link href={`/run?event=${ev.id}`} className="ml-auto">
-                  <Button variant="outline" size="sm">Run →</Button>
-                </Link>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

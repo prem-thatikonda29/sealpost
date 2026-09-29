@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 
 from ..cert_engine import generate_preview_png
+from ..paths import resolve
 from ..schemas import PreviewRequest
 
 router = APIRouter(prefix="/api/preview", tags=["preview"])
@@ -18,7 +19,7 @@ async def preview_certificate(body: PreviewRequest, background_tasks: Background
     if not body.template_path:
         raise HTTPException(status_code=422, detail="template_path is required")
 
-    if not os.path.exists(body.template_path):
+    if not resolve(body.template_path).exists():
         raise HTTPException(status_code=404, detail="Template file not found")
 
     try:
@@ -32,6 +33,11 @@ async def preview_certificate(body: PreviewRequest, background_tasks: Background
             font_color=body.font_color,
             max_text_width=body.max_text_width,
         )
+    except FileNotFoundError as exc:
+        # A missing template or font is the caller's input being wrong, not a
+        # server fault — 422 keeps it out of the error logs and the frontend
+        # shows `detail` either way.
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
