@@ -205,6 +205,16 @@ The element carries `role="application"`. That is deliberate and load-bearing: s
 
 Motion: none. The name and the anchor marker track the keyboard exactly as they track the pointer, with no easing — direct manipulation shouldn't lag the input.
 
+#### The width guides
+
+`max_text_width` is a number in a sidebar, and a number does not tell you what a span *looks* like on a particular template. So while a name is placed, two dashed verticals mark the limit: the name is centred on the anchor and may run half of `max_text_width` either side of it, so the guides sit at `x ± max_text_width / 2` and are the exact boundary the renderer enforces — not an approximation of it.
+
+They are lines and not a box on purpose. `max_text_width` bounds the span horizontally and says nothing about height; a box would imply a vertical limit that `fit_font` does not have.
+
+They brighten to full terra when `fittedSize < fontSize` — that is, when the limit is actually costing the user something — and a caption under the canvas says so in words and numbers (`96px → 42px`). The guides are editor-only and never reach the PDF. Drawn beneath the name so the type always reads on top of them.
+
+Near a template edge the limit runs off the canvas. Those lines clamp to the edge and switch from dashed to **solid**, which distinguishes "the boundary is exactly here" from "the boundary carries on past this edge". Without it, a name placed near an edge would silently show one guide and read as a bug.
+
 #### Check exact output
 
 Beneath the canvas, a `<details>` disclosure mounts `CertPreview`, which POSTs to `/api/preview` and renders the true server-side PNG — same `fit_font` shrink, same Pillow shaping, same face. It is collapsed by default and mounted only once a template and a position exist, so opening it is never a dead end. The canvas above it updates per keystroke with no round-trip; this is the thing you open when the name is nearly right and you want to stop guessing.

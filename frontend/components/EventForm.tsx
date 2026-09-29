@@ -47,7 +47,10 @@ interface OverlayProps {
   naturalHeight: number;
   posX: number;
   posY: number;
+  /** The size asked for. */
   fontSize: number;
+  /** The size the PDF will actually use, after fit_font's shrink. */
+  fittedSize: number;
   fontStyle: string;
   fontColor: string;
   fontFamily: string | null;
@@ -80,6 +83,7 @@ function CertCanvas({
   posX,
   posY,
   fontSize,
+  fittedSize,
   fontStyle,
   fontColor,
   fontFamily,
@@ -115,20 +119,32 @@ function CertCanvas({
   const scale = naturalWidth > 0 && containerW > 0 ? containerW / naturalWidth : 0;
   const textDisplayX = posX * scale;
   const textDisplayY = posY * scale;
-  // The name auto-shrinks past max_text_width. Mirror cert_engine.fit_font so
-  // the canvas shows the size the PDF will use, not the un-fitted size.
-  const fittedSize = fitFontSize(
-    sampleText || "Sample Name",
-    fontSize,
-    maxTextWidth,
-    fontFamily,
-    fontStyle
-  );
   const displayFontSize = Math.max(fittedSize * scale, 8);
 
   const isBold = fontStyle === "bold" || fontStyle === "bold_italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold_italic";
   const hasPosition = posX > 0 && posY > 0;
+
+  // fit_font only shrinks once the name would overflow max_text_width, so a
+  // fitted size below the asked-for one means the limit is doing something.
+  const atLimit = fittedSize < fontSize;
+
+  /* The name is centred on the anchor, so the width it may occupy runs half of
+     maxTextWidth either side of it. These are those two lines — not a box:
+     max_text_width bounds the span horizontally and says nothing about height,
+     and a box would imply a vertical limit the renderer does not have.
+
+     Near an edge the limit runs off the template. Clamping to the canvas and
+     drawing those lines solid is the difference between "the boundary is
+     exactly here" and "the boundary carries on past this edge" — without it a
+     placed-near-the-edge name would show one line and look broken. */
+  const halfSpan = (maxTextWidth * scale) / 2;
+  const rawLeft = textDisplayX - halfSpan;
+  const rawRight = textDisplayX + halfSpan;
+  const guides = [
+    { at: Math.max(0, rawLeft), clipped: rawLeft < 0 },
+    { at: Math.min(containerW, rawRight), clipped: rawRight > containerW },
+  ];
 
   /* Centre is the keyboard equivalent of "where the pointer would have
      clicked" — the neutral starting point when nothing is placed yet. */
@@ -186,7 +202,8 @@ function CertCanvas({
       <span id={hintId} className="sr-only">
         Certificate name position. Use the arrow keys to move the name, or hold
         Shift with an arrow key to move ten pixels at a time. Press Enter to
-        place it at the centre.
+        place it at the centre. The two vertical lines mark the widest the name
+        may run; a longer name is shrunk to stay inside them.
       </span>
       <span aria-live="polite" aria-atomic="true" className="sr-only">
         {hasPosition ? `${posX} by ${posY} pixels` : "Not placed yet"}
@@ -208,6 +225,30 @@ function CertCanvas({
             Upload a JPEG or PNG to start placing the name
           </p>
         </div>
+      )}
+
+      {/* Max-width guides. Drawn under the name so the type always reads on
+          top of them, and only once placed — the span is centred on the
+          anchor, so before placement there is nothing to centre it on. They
+          brighten when the name is actually being shrunk, which is the moment
+          the number in the sidebar stops being abstract. */}
+      {hasPosition && templateUrl && scale > 0 && maxTextWidth > 0 && (
+        <>
+          {guides.map((g, i) => (
+            <div
+              key={i}
+              aria-hidden
+              className={`pointer-events-none absolute inset-y-0 border-l transition-colors duration-150 ${
+                g.clipped
+                  ? "border-solid border-terra-ink"
+                  : atLimit
+                    ? "border-dashed border-terra-ink"
+                    : "border-dashed border-terra-ink/45"
+              }`}
+              style={{ left: g.at }}
+            />
+          ))}
+        </>
       )}
 
       {/* Live text overlay — only render once we have a valid scale */}
@@ -342,6 +383,18 @@ export function EventForm({ initial, onSave, saving }: Props) {
   // somewhere — otherwise the only symptom is a subtly wrong typeface.
   const { family: fontFamily, error: fontFaceError } = useFontFace(
     fontSelection?.url ?? null
+  );
+
+  // Measured once here and shared by the canvas and the caption beneath it, so
+  // the two cannot disagree about whether the name is being shrunk. Returns
+  // the size asked for until the face has loaded — measuring against the
+  // fallback face would give a size for the wrong typeface.
+  const fittedSize = fitFontSize(
+    sampleText || "Sample Name",
+    formValues.font_size,
+    formValues.max_text_width,
+    fontFamily,
+    formValues.font_style
   );
 
   // Fetch the vendored catalog once. Held as `null` until it lands so the
@@ -559,6 +612,7 @@ export function EventForm({ initial, onSave, saving }: Props) {
             posX={posX}
             posY={posY}
             fontSize={formValues.font_size}
+            fittedSize={fittedSize}
             fontStyle={formValues.font_style}
             fontColor={formValues.font_color}
             fontFamily={fontFamily}
@@ -574,6 +628,29 @@ export function EventForm({ initial, onSave, saving }: Props) {
             Click the template to place the name — or tab to it and nudge with
             the arrow keys. Hold Shift for 10px steps.
           </p>
+
+          {/* Says in words what the guides show. The number lives in the
+              sidebar, but whether it is currently costing the user anything is
+              only visible here. */}
+          {templatePath && posX > 0 && posY > 0 && (
+            <p className="max-w-[70ch] text-[12px] leading-relaxed text-muted-foreground">
+              {fittedSize < formValues.font_size ? (
+                <>
+                  The name is wider than {formValues.max_text_width}px, so it is
+                  being shrunk to fit —{" "}
+                  <span className="font-mono tabular text-terra-ink">
+                    {formValues.font_size}px → {fittedSize}px
+                  </span>
+                  . Raise Max width, or shorten the name, to keep it larger.
+                </>
+              ) : (
+                <>
+                  The dashed lines mark the {formValues.max_text_width}px width
+                  limit. A name wider than that is shrunk to stay inside them.
+                </>
+              )}
+            </p>
+          )}
 
           {fontFaceError && (
             <p role="alert" className="text-[12px] leading-relaxed text-rose-ink">
