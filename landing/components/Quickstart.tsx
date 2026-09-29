@@ -17,9 +17,11 @@ export default function Quickstart() {
         </p>
         <div className="mt-10 space-y-8">
           <div>
-            <h3 className="text-sm font-semibold text-text mb-3">Installation</h3>
+            <h3 className="text-sm font-semibold text-text mb-3">
+              Installation
+            </h3>
             <CodeBlock
-              code={`git clone https://github.com/prem-thatikonda29/Certificates-Sender.git\ncd cert-sender\npip install -r requirements.txt`}
+              code={`git clone https://github.com/prem-thatikonda29/Certificates-Sender.git\ncd Certificates-Sender\npip install -r backend/requirements.txt\ncd frontend && npm install`}
               label="terminal"
             />
           </div>
@@ -33,16 +35,24 @@ export default function Quickstart() {
               Gmail credentials:
             </p>
             <CodeBlock
-              code={`EMAIL=your-email@gmail.com\nPASSWORD=your-app-password`}
+              code={`GMAIL_USER=your-email@gmail.com\nGMAIL_APP_PASSWORD=your-16-char-app-password`}
               label=".env"
             />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-text mb-3">Usage</h3>
+            <h3 className="text-sm font-semibold text-text mb-3">Run</h3>
             <CodeBlock
-              code={`# Generate + send certificates for winners\npython run.py winner\n\n# Dry run (generate PDFs only, no email)\npython run.py winner --dry-run\n\n# Send in batches of 10\npython run.py participants --batch=10`}
+              code={`bash start.sh\n\n# backend  http://localhost:8000\n# frontend http://localhost:3000`}
               label="terminal"
             />
+            <p className="text-[13px] text-text-muted mt-3">
+              Open{" "}
+              <code className="font-mono text-accent-terra-text bg-accent-terra px-1.5 py-0.5 text-[12px]">
+                http://localhost:3000
+              </code>{" "}
+              and start there. Events, runs, and history all live in the
+              browser.
+            </p>
           </div>
         </div>
       </div>
