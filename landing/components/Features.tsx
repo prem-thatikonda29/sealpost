@@ -44,7 +44,7 @@ const features = [
     icon: ChartBarHorizontal,
     title: "Generate & Download",
     description:
-      "Produce every certificate and download the zip without sending an email",
+      "Generate every certificate and download the zip without sending a single email",
     color: "bg-accent-sage",
     textColor: "text-accent-sage-text",
   },

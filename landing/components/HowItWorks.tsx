@@ -13,7 +13,7 @@ const steps = [
     number: "02",
     title: "Upload & map your CSV",
     description:
-      "Upload a CSV per tier and map its columns — names-only CSVs and split name columns work too",
+      "Upload a CSV per tier and map its columns. Names-only CSVs and split name columns work too",
   },
   {
     number: "03",
@@ -56,28 +56,32 @@ export default function HowItWorks() {
         <div className="mt-12">
           <div className="bg-surface border border-border overflow-hidden transition-colors duration-150 hover:border-border-hover">
             <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
-              <span className="text-[11px] text-text-faint font-mono">run</span>
+              <span className="text-[11px] text-text-faint font-mono">
+                history · when a row doesn&apos;t go through
+              </span>
             </div>
             <pre className="p-4 overflow-x-auto">
               <code className="text-[13px] font-mono text-text leading-relaxed">
-                <span className="text-accent-sage-text">sent</span>
-                {"    priya@hackathon.dev"}
-                {"\n"}
-                <span className="text-accent-sage-text">sent</span>
-                {"    amir@hackathon.dev"}
+                <span className="text-accent-amber-text">invalid</span>
+                {"   sam@gmial.com   "}
+                <span className="text-text-muted">
+                  caught before the send, nothing went out
+                </span>
                 {"\n"}
                 <span className="text-accent-rose-text">failed</span>
-                {"  rahul@hackathon.dev"}
-                {"\n"}
-                <span className="text-accent-amber-text">invalid</span>
-                {" sam@gmial.com"}
-                {"\n"}
+                {"    SMTP refused    "}
                 <span className="text-text-muted">
-                  {"\n"}  … and 570 more rows
+                  retry from the History page
+                </span>
+                {"\n"}
+                <span className="text-accent-rose-text">bounced</span>
+                {"   NDR arrived      "}
+                <span className="text-text-muted">
+                  re-send after fixing the address
                 </span>
                 {"\n"}
                 <span className="text-accent-sage-text">
-                  {"\n"}  573 sent · 12 failed · 3 invalid
+                  {"\n  573 sent · 15 need attention · re-send targets just those 15"}
                 </span>
               </code>
             </pre>

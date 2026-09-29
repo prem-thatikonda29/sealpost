@@ -112,7 +112,7 @@ Three steps become the browser flow:
 2. **Upload & map your CSV** — per-tier CSVs, column mapping; names-only CSVs work
 3. **Send and watch** — live per-row status, bounce detection, re-send the failures
 
-The `python run.py winner` terminal block becomes a proof block in the same card style: a short per-row outcome list in the existing mono/body type (three rows like `sent — priya@example.com`, `invalid domain — sam@gmial.com`, `failed — retry available`), closed by a summary line `573 sent · 12 failed · 3 invalid`. No `$` prompt, no fake window chrome — **not terminal cosplay**; `PRODUCT.md` explicitly bans dressing the tool up as a CLI.
+The `python run.py winner` terminal block is replaced by a failure-diagnostic block in the same card style, labelled `history · when a row doesn't go through`. It teaches the three failure statuses before the reader ever hits one: `invalid` (caught before the send, nothing went out), `failed` (SMTP refused, retry from History), `bounced` (NDR arrived, re-send after fixing), closed by `573 sent · 15 need attention · re-send targets just those 15`. It carries real information rather than a decorative send log. No `$` prompt, no fake window chrome — **not terminal cosplay**; `PRODUCT.md` explicitly bans dressing the tool up as a CLI.
 
 ### Quickstart.tsx — the new setup guide
 

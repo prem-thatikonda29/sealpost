@@ -6,18 +6,18 @@ import { useReveal } from "./useReveal";
 const places = [
   {
     where: ".env",
-    what: "Gmail credentials — GMAIL_USER and GMAIL_APP_PASSWORD",
-    detail: "Only credentials required to send",
+    what: "Gmail credentials: GMAIL_USER and GMAIL_APP_PASSWORD",
+    detail: "The only credentials you need to send",
   },
   {
     where: "Event",
     what: "Template, name position, font, email subject and body",
-    detail: "Created under Events → New Event",
+    detail: "Made under Events → New Event",
   },
   {
     where: "Tier",
     what: "CSV, column mapping, per-tier email overrides",
-    detail: "Checked and uploaded on the Run page",
+    detail: "Uploaded and mapped on the Run page",
   },
 ];
 
@@ -31,8 +31,8 @@ export default function Configuration() {
           Configuration
         </h2>
         <p className="mt-3 text-text-muted max-w-[50ch] leading-relaxed">
-          Three places hold a run&apos;s configuration — no config files to
-          edit.
+          Everything a run needs lives in three places, and none of them are
+          config files.
         </p>
         <div className="mt-10 overflow-x-auto border border-border">
           <table className="w-full text-left">

@@ -1,17 +1,17 @@
 # Cert Sender
 
-Browser-based certificate generation and email sending tool. Upload templates, position names visually, upload participant CSVs, and send certificates with real-time progress — no terminal required.
+Browser-based certificate generation and email sending tool. Upload templates, position names visually, upload participant CSVs, and send certificates with real-time progress. No terminal required.
 
 ## Features
 
-- **Visual name positioning** — Figma-style canvas editor: click on the template to set the exact center point, with live text overlay and marked max-text-width guides
-- **Tier checklist with column mapping** — per-tier CSV upload on the Run page; names-only CSVs and split name columns are mapped for you
-- **Email pre-validation** — DNS MX check before sending catches bad domains (typos like `@gmial.com`), plus a warning before re-sending to people who already have the certificate
-- **Live per-row progress** — sent / failed / invalid domain statuses update in real time; after sending, bounce detection polls your Gmail inbox for NDRs
-- **Re-send failures** — retry only the rows that missed out, with a message you can rewrite
-- **Generate all and download** — a dry run that actually generates every certificate, downloaded as a zip
-- **Job history** — per-row status, CSV export, delete a job or clear the history along with its certificates
-- **Bundled font library** — pick from bundled fonts or upload your own
+- **Visual name positioning**: a canvas editor where you click the template to set the exact center point, with live text overlay and max-text-width guides marked on the canvas
+- **Tier checklist with column mapping**: upload a CSV per tier on the Run page, and map its columns; names-only CSVs and split name columns work too
+- **Email pre-validation**: a DNS MX check catches bad domains (typos like `@gmial.com`) before anything goes out, and you get a warning before re-sending to anyone who already has the certificate
+- **Live per-row progress**: every row shows sent, failed, or invalid domain as it happens; after the send, bounce detection polls your Gmail inbox for NDRs
+- **Re-send failures**: retry only the rows that missed out, with a message you can rewrite
+- **Generate all and download**: a dry run that generates every certificate, packaged up as a zip
+- **Job history**: per-row status and CSV export, plus delete a job or clear the history
+- **Bundled font library**: pick from the bundled fonts or upload your own
 
 ## Prerequisites
 
@@ -70,11 +70,11 @@ cd frontend && npm run dev
 ## First-time flow
 
 1. Go to `http://localhost:3000`
-2. **Events → New Event** — upload a template image, click on it to place the name, choose a font, write the email subject/body
-3. **Run** — check the tiers you want to run, upload each tier's CSV, map columns, optionally validate emails, start the job
-4. Watch live progress — sent / invalid / failed rows update in real time
-5. After ~30s, bounce check runs automatically against your Gmail inbox
-6. **History** — view any past job, re-send to the people who missed out, export CSV, or delete the job with its certificates
+2. **Events → New Event**: upload a template image, click on it to place the name, choose a font, write the email subject/body
+3. **Run**: check the tiers you want, upload each tier's CSV, map the columns, optionally validate emails, start the job
+4. Watch live progress: sent, invalid, and failed rows update in real time
+5. After ~30s, the bounce check runs automatically against your Gmail inbox
+6. **History**: open any past job, re-send to the people who missed out, export CSV, or delete the job with its certificates
 
 ## Runtime directories
 

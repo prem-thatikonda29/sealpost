@@ -16,8 +16,8 @@ export default function Hero() {
           Send hackathon certificates<br />in minutes
         </h1>
         <p className="mt-6 text-lg text-text-muted leading-relaxed max-w-[50ch]">
-          Place names visually, upload a CSV, and watch every send land — or
-          fail — in real time.
+          Place names visually, upload a CSV, and watch every send land or fail
+          as it happens.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row gap-3">
           <a

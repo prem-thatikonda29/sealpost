@@ -50,7 +50,8 @@ export default function Quickstart() {
               <code className="font-mono text-accent-terra-text bg-accent-terra px-1.5 py-0.5 text-[12px]">
                 http://localhost:3000
               </code>{" "}
-              — events, runs, and history all live in the browser.
+              and start there. Events, runs, and history all live in the
+              browser.
             </p>
           </div>
         </div>
