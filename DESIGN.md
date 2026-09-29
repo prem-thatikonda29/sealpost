@@ -223,6 +223,12 @@ Beneath the canvas, a `<details>` disclosure mounts `CertPreview`, which POSTs t
 
 ## Known gaps
 
-- **An uploaded font can only render its regular face.** The upload route stores one file under a fresh UUID prefix, so nothing can sit beside it for `_load_font`'s sibling probe to find. Uploading `Inter-Bold.ttf` therefore renders bold for *every* style, including normal. Supporting per-style uploads would mean a multi-file upload and a naming scheme that preserves the stem; until then the picker correctly reports one style.
 - **Re-sending a certificate to one person is not possible.** The history page's copy implies it, but no endpoint exists, and a re-send would need to re-render — which today only happens inside a job.
 - **`components/ui/card.tsx` and `label.tsx` are unreferenced.** Every other primitive in `ui/` is imported by at least one screen. `Card` is the one to think about rather than merely delete: the app's grid device is a hairline-separated `div`, not a card, so if it gets used it should be checked against that rule first. `Label` is superseded by the `.label-mono` class, which is what actually encodes the label register.
+
+## Accepted limitations
+
+Deliberate, not deferred. Each was considered and the cost was judged worth paying.
+
+- **An uploaded font renders in its regular face only.** The upload route stores one file under a fresh UUID prefix, so nothing can sit beside it for `_load_font`'s sibling probe to find — uploading `Inter-Bold.ttf` renders bold for *every* style, including normal. Fixing it means a multi-file upload and a naming scheme that preserves the stem. The 14 bundled families are unaffected and cover the common case; uploads exist for the font someone already has. The picker reports one style for an upload rather than offering weights that will not render.
+- **`max_text_width` bounds the span horizontally only.** A name wider than the template's height still overflows vertically. Nothing enforces a vertical bound, which is why the canvas guides are lines and not a box — see above.
