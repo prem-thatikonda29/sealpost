@@ -281,6 +281,8 @@ It is now **Generate all and download**, and it does what it says: every certifi
 
 This is not redundant with **Check exact output**, which is the reason it was worth making real. The editor previews *one* certificate for a name typed into a box. What actually goes wrong in a batch is specific names — a forty-character name shrinking to the floor, a glyph the chosen font does not carry, an empty cell — and none of those appear until the real CSV is run through. It is the only thing that tests the input that will actually be sent.
 
+**It skips address validation entirely, and that is not just an optimisation.** Phase 1's result, `valid_indices`, is what phase 2 iterates — so validating a generate-only run does not merely waste DNS lookups, it *drops* the rows whose domains do not resolve from generation. "Generate all" would hand back fewer certificates than there are names, which is the one thing the feature cannot do. A generate-only run therefore takes every row, marks nothing invalid, and produces no `validating` phase.
+
 The zip is built with `ZIP_STORED`, not deflated: the PDFs are mostly JPEG, so deflating spends CPU to save almost nothing. It streams off a temp file rather than being assembled in memory, because a thousand certificates is a few hundred megabytes, and the temp file is removed once the response has been sent.
 
 **Check exact output** remains for the editing loop — it is faster and it belongs next to the thing being edited.

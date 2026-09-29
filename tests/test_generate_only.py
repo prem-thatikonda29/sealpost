@@ -140,6 +140,76 @@ class TestItRenders:
 # ── It sends nothing ──────────────────────────────────────────────────────────
 
 
+class TestNoAddressCheckingAtAll:
+    """Nothing is sent, so nothing about an address can be wrong.
+
+    This is not only wasted work. Phase 1's result, `valid_indices`, is what
+    phase 2 iterates — so validating a generate-only run silently *dropped* the
+    rows whose domains did not resolve, and "generate all" produced fewer
+    certificates than there were names.
+    """
+
+    def test_an_unreachable_domain_still_gets_a_certificate(self, env, monkeypatch):
+        monkeypatch.setattr(email_validator, "validate_mx",
+                            lambda email: (False, "domain_not_found"))
+        run(env, PEOPLE, dry_run=True)
+
+        files = sorted(p.name for p in (env.output / "job-1").iterdir())
+        assert len(files) == 2
+
+    def test_a_run_with_every_row_invalid_still_produces_them_all(self, env, monkeypatch):
+        monkeypatch.setattr(email_validator, "validate_mx",
+                            lambda email: (False, "domain_not_found"))
+        run(env, [("A", "a@nowhere.invalid"), ("B", "b@nowhere.invalid")], dry_run=True)
+        assert len(list((env.output / "job-1").iterdir())) == 2
+
+    def test_no_row_is_marked_invalid(self, env, monkeypatch):
+        monkeypatch.setattr(email_validator, "validate_mx",
+                            lambda email: (False, "domain_not_found"))
+        run(env, PEOPLE, dry_run=True)
+
+        db = env.session_factory()
+        job = db.query(Job).filter(Job.id == "job-1").first()
+        statuses = sorted(r.status for r in db.query(JobRow).all())
+        db.close()
+        assert job.invalid_count == 0
+        assert statuses == ["generated", "generated"]
+
+    def test_no_dns_lookup_is_made(self, env, monkeypatch):
+        # The whole point: generating needs no network, so a generate-only run
+        # should not make one — and should not hang on a 5s DNS timeout for a
+        # dead domain either.
+        called = []
+        monkeypatch.setattr(email_validator, "validate_mx",
+                            lambda email: called.append(email) or (True, "ok"))
+        run(env, PEOPLE, dry_run=True)
+        assert called == []
+
+    def test_validation_is_not_announced_as_a_phase(self, env):
+        events = run(env, PEOPLE, dry_run=True)
+        phases = [e["phase"] for e in events if e["type"] == "phase"]
+        assert "validating" not in phases
+
+    def test_a_real_send_still_validates(self, env, monkeypatch):
+        # The skip must be scoped to generate-only, or real sends would stop
+        # filtering bad addresses.
+        called = []
+        monkeypatch.setattr(email_validator, "validate_mx",
+                            lambda email: called.append(email) or (True, "ok"))
+        run(env, PEOPLE, dry_run=False)
+        assert called == ["ada@x.com", "grace@x.com"]
+
+    def test_a_real_send_still_excludes_invalid_rows(self, env, monkeypatch):
+        monkeypatch.setattr(email_validator, "validate_mx",
+                            lambda email: (False, "domain_not_found"))
+        run(env, PEOPLE, dry_run=False)
+        # Nothing generated, nothing sent.
+        assert env.sent == []
+        assert not (env.output / "job-1").exists() or not list(
+            (env.output / "job-1").iterdir()
+        )
+
+
 class TestItSendsNothing:
     def test_no_mail_is_sent(self, env):
         run(env, PEOPLE, dry_run=True)

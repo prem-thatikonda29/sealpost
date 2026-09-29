@@ -40,7 +40,11 @@ export function JobProgress({
   doneActions?: React.ReactNode;
 }) {
   const [rows, setRows] = useState<Map<number, RowState>>(new Map());
-  const [phase, setPhase] = useState<Phase>("validating");
+  // A generate-only run never validates, so starting on "Checking addresses…"
+  // would be a phase it is never going to be in.
+  const [phase, setPhase] = useState<Phase>(
+    dryRun ? "generating" : "validating"
+  );
   const [summary, setSummary] = useState<DoneSummary | null>(null);
   const esRef = useRef<EventSource | null>(null);
 

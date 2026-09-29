@@ -84,42 +84,51 @@ async def run_job(
         # ------------------------------------------------------------------
         # Phase 1 — Pre-flight DNS MX validation
         # ------------------------------------------------------------------
-        # Every row is checked before the first email goes out, so on a large
-        # list this is a long stretch with nothing else to show. Announce it
-        # rather than leaving the UI on "Processing" with an empty list.
-        _push(job_id, {"type": "phase", "phase": "validating"})
-
         loop = asyncio.get_event_loop()
-        valid_indices: List[int] = []  # row indices that passed validation
 
-        for row_idx, row in enumerate(rows_to_process):
-            db_row = db.query(JobRow).filter(
-                JobRow.job_id == job_id, JobRow.row_index == row_idx
-            ).first()
-            if not db_row:
-                continue
+        if dry_run:
+            # Generate-only, so there is nothing an address could be wrong for.
+            # Skipping this is not merely saving the lookups: valid_indices is
+            # what phase 2 iterates, so a row whose domain did not resolve would
+            # be dropped from *generation* too — and "generate all" would
+            # quietly hand back fewer certificates than there are names.
+            valid_indices = list(range(len(rows_to_process)))
+        else:
+            # Every row is checked before the first email goes out, so on a
+            # large list this is a long stretch with nothing else to show.
+            # Announce it rather than leaving the UI on "Processing" with an
+            # empty list.
+            _push(job_id, {"type": "phase", "phase": "validating"})
 
-            email = row.get("email", "").strip()
-            valid, reason = await loop.run_in_executor(
-                None, email_validator.validate_mx, email
-            )
+            valid_indices = []
+            for row_idx, row in enumerate(rows_to_process):
+                db_row = db.query(JobRow).filter(
+                    JobRow.job_id == job_id, JobRow.row_index == row_idx
+                ).first()
+                if not db_row:
+                    continue
 
-            if not valid:
-                db_row.status = "invalid_domain"
-                db_row.error_message = reason
-                db.commit()
-                job.invalid_count = (job.invalid_count or 0) + 1
-                db.commit()
-                _push(job_id, {
-                    "type": "row",
-                    "index": row_idx,
-                    "name": row.get("name", ""),
-                    "email": email,
-                    "status": "invalid_domain",
-                    "error": reason,
-                })
-            else:
-                valid_indices.append(row_idx)
+                email = row.get("email", "").strip()
+                valid, reason = await loop.run_in_executor(
+                    None, email_validator.validate_mx, email
+                )
+
+                if not valid:
+                    db_row.status = "invalid_domain"
+                    db_row.error_message = reason
+                    db.commit()
+                    job.invalid_count = (job.invalid_count or 0) + 1
+                    db.commit()
+                    _push(job_id, {
+                        "type": "row",
+                        "index": row_idx,
+                        "name": row.get("name", ""),
+                        "email": email,
+                        "status": "invalid_domain",
+                        "error": reason,
+                    })
+                else:
+                    valid_indices.append(row_idx)
 
         # ------------------------------------------------------------------
         # Phase 2 — Generate + Send
