@@ -17,7 +17,7 @@ interface RowState {
  * over the whole list, which runs before the first email and so is the one
  * stretch where nothing else is happening.
  */
-type Phase = "validating" | "sending" | "bounce_check" | "done";
+type Phase = "validating" | "generating" | "sending" | "bounce_check" | "done";
 
 interface DoneSummary {
   sent: number;
@@ -26,7 +26,19 @@ interface DoneSummary {
   bounced: number;
 }
 
-export function JobProgress({ jobId, total }: { jobId: string; total: number }) {
+export function JobProgress({
+  jobId,
+  total,
+  dryRun = false,
+  doneActions,
+}: {
+  jobId: string;
+  total: number;
+  /** A generate-only run counts what it produced, not what it sent. */
+  dryRun?: boolean;
+  /** Rendered once the job finishes — a download link, typically. */
+  doneActions?: React.ReactNode;
+}) {
   const [rows, setRows] = useState<Map<number, RowState>>(new Map());
   const [phase, setPhase] = useState<Phase>("validating");
   const [summary, setSummary] = useState<DoneSummary | null>(null);
@@ -85,15 +97,21 @@ export function JobProgress({ jobId, total }: { jobId: string; total: number }) 
   const statusLabel =
     phase === "validating"
       ? "Checking addresses…"
-      : phase === "sending"
-        ? "Generating and sending"
-        : phase === "bounce_check"
-          ? "Checking for bounces…"
-          : "Complete";
+      : phase === "generating"
+        ? "Generating certificates"
+        : phase === "sending"
+          ? "Generating and sending"
+          : phase === "bounce_check"
+            ? "Checking for bounces…"
+            : "Complete";
 
   const summaryCells = summary
     ? [
-        { label: "Sent", value: summary.sent, tone: "text-sage-ink" },
+        // A generate-only run sent nothing, so "Sent" would be false however
+        // many rows there are. total_rows is the number produced.
+        dryRun
+          ? { label: "Generated", value: total, tone: "text-sage-ink" }
+          : { label: "Sent", value: summary.sent, tone: "text-sage-ink" },
         { label: "Failed", value: summary.failed, tone: "text-rose-ink" },
         { label: "Invalid", value: summary.invalid, tone: "text-amber-ink" },
         { label: "Bounced", value: summary.bounced, tone: "text-terra-ink" },
@@ -112,6 +130,8 @@ export function JobProgress({ jobId, total }: { jobId: string; total: number }) 
         </div>
         <Progress value={phase === "done" ? 100 : pct} />
       </div>
+
+      {phase === "done" && doneActions && <div>{doneActions}</div>}
 
       {/* Bounce polling */}
       {phase === "bounce_check" && (

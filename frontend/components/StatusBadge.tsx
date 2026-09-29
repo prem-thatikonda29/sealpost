@@ -23,6 +23,9 @@ const STATUS: Record<string, Meta> = {
   failed: { variant: "danger", label: "Failed" },
   // row-level
   sent: { variant: "ok", label: "Sent" },
+  // Rendered but deliberately not emailed — a "generate all and download" run.
+  // Not "skipped", which would suggest nothing happened.
+  generated: { variant: "ok", label: "Generated" },
   invalid_domain: { variant: "warn", label: "Invalid domain" },
   bounced: { variant: "info", label: "Bounced" },
   skipped: { variant: "neutral", label: "Dry run" },
@@ -36,6 +39,7 @@ const STATUS: Record<string, Meta> = {
 /** Statuses that mean "this row is finished, one way or another". */
 const TERMINAL = new Set([
   "sent",
+  "generated",
   "failed",
   "invalid_domain",
   "bounced",

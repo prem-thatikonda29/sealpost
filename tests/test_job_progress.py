@@ -130,14 +130,14 @@ class TestRowStates:
         db.close()
         assert stored == {"sent"}
 
-    def test_a_dry_run_streams_no_generating_or_sending(self, env):
-        # Nothing is rendered and nothing is sent, so claiming otherwise would
-        # be the UI inventing work that is not happening.
+    def test_a_dry_run_generates_but_never_sends(self, env):
+        # It used to do neither, which made the option's own label false. Now it
+        # renders — so "generating" must appear — and still must not claim to be
+        # sending anything.
         events = run_job(env, [("Ada Lovelace", "ada@example.com")], dry_run=True)
         statuses = [e["status"] for e in row_events(events, 0)]
-        assert "generating" not in statuses
+        assert statuses == ["generating", "generated"]
         assert "sending" not in statuses
-        assert statuses == ["skipped"]
 
 
 # ── Phases ────────────────────────────────────────────────────────────────────

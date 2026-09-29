@@ -146,7 +146,7 @@ async def run_job(
         output_dir = str(OUTPUT_DIR / job_id)
         os.makedirs(output_dir, exist_ok=True)
 
-        _push(job_id, {"type": "phase", "phase": "sending"})
+        _push(job_id, {"type": "phase", "phase": "generating" if dry_run else "sending"})
 
         template_path = event_config.get("template_path", "")
         text_position = (
@@ -180,22 +180,27 @@ async def run_job(
             }
 
             try:
+                # A dry run renders and stops. Originally it did neither, which
+                # made the label ("generate the certificates but send nothing")
+                # false — and left no way to check how a *real* list of names
+                # comes out, since the editor only ever previews one sample.
+                _push(job_id, {**row_event, "status": "generating"})
+                await loop.run_in_executor(
+                    None,
+                    lambda n=name, p=pdf_path: cert_engine.generate_certificate(
+                        name=n,
+                        template_path=template_path,
+                        text_position=text_position,
+                        output_path=p,
+                        font_path=event_config.get("font_path"),
+                        font_size=event_config.get("font_size", 48),
+                        font_style=event_config.get("font_style", "normal"),
+                        font_color=event_config.get("font_color", "#000000"),
+                        max_text_width=event_config.get("max_text_width", 1400),
+                    ),
+                )
+
                 if not dry_run:
-                    _push(job_id, {**row_event, "status": "generating"})
-                    await loop.run_in_executor(
-                        None,
-                        lambda n=name, p=pdf_path: cert_engine.generate_certificate(
-                            name=n,
-                            template_path=template_path,
-                            text_position=text_position,
-                            output_path=p,
-                            font_path=event_config.get("font_path"),
-                            font_size=event_config.get("font_size", 48),
-                            font_style=event_config.get("font_style", "normal"),
-                            font_color=event_config.get("font_color", "#000000"),
-                            max_text_width=event_config.get("max_text_width", 1400),
-                        ),
-                    )
                     _push(job_id, {**row_event, "status": "sending"})
                     await loop.run_in_executor(
                         None,
@@ -209,9 +214,13 @@ async def run_job(
                         ),
                     )
 
-                db_row.status = "sent" if not dry_run else "skipped"
-                db.commit()
-                job.sent_count = (job.sent_count or 0) + 1
+                if dry_run:
+                    # Nothing was sent, so nothing counts as sent. total_rows is
+                    # the number generated, and the zip is what the run is for.
+                    db_row.status = "generated"
+                else:
+                    db_row.status = "sent"
+                    job.sent_count = (job.sent_count or 0) + 1
                 db.commit()
                 _push(job_id, {**row_event, "status": db_row.status})
 

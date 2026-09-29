@@ -6,6 +6,7 @@ import {
   getEvents,
   createJob,
   checkDuplicates,
+  jobDownloadUrl,
   type Event,
   type DuplicateRecipient,
 } from "@/lib/api";
@@ -105,6 +106,10 @@ function RunPageInner() {
   const selectedTiers = tiers.filter((t) => t.checked);
   const allReady =
     selectedTiers.length > 0 && selectedTiers.every((t) => t.csvFile !== null);
+  const totalRows = selectedTiers.reduce(
+    (n, t) => n + (t.csvRows?.length ?? 0),
+    0
+  );
 
   const handleStart = async () => {
     setStarting(true);
@@ -195,7 +200,21 @@ function RunPageInner() {
                 <h2 className="text-sm font-semibold">{job.eventName}</h2>
               </div>
               <div className="p-4">
-                <JobProgress jobId={job.jobId} total={job.total} />
+                <JobProgress
+                  jobId={job.jobId}
+                  total={job.total}
+                  dryRun={dryRun}
+                  doneActions={
+                    dryRun ? (
+                      <a
+                        href={jobDownloadUrl(job.jobId)}
+                        className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[13px] font-medium transition-colors duration-150 hover:border-hair-hover hover:bg-surface-raised"
+                      >
+                        Download {job.total} certificates (.zip)
+                      </a>
+                    ) : undefined
+                  }
+                />
               </div>
             </div>
           ))}
@@ -356,21 +375,26 @@ function RunPageInner() {
               <h2 className="text-sm font-semibold">Run options</h2>
             </div>
             <div className="space-y-4 p-4">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-start gap-2.5">
                 <Checkbox
                   id="dryRun"
                   checked={dryRun}
                   onCheckedChange={(v) => setDryRun(!!v)}
+                  className="mt-0.5"
                 />
-                <label
-                  htmlFor="dryRun"
-                  className="cursor-pointer text-[13px] select-none"
-                >
-                  Dry run
-                </label>
-                <span className="text-[12px] text-muted-foreground">
-                  — generate the certificates but send nothing
-                </span>
+                <div className="space-y-1">
+                  <label
+                    htmlFor="dryRun"
+                    className="cursor-pointer text-[13px] font-medium select-none"
+                  >
+                    Generate all and download
+                  </label>
+                  <p className="max-w-[60ch] text-[12px] leading-relaxed text-muted-foreground">
+                    For when you don&apos;t want to send yet. Every certificate
+                    is generated and nothing is emailed — when it finishes you
+                    can download the lot as a zip.
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -410,11 +434,17 @@ function RunPageInner() {
             className="w-full"
           >
             {starting
-              ? "Starting…"
+              ? dryRun
+                ? "Generating…"
+                : "Starting…"
               : selectedTiers.length > 1
-                ? `Start ${selectedTiers.length} tiers`
+                ? dryRun
+                  ? `Generate ${totalRows} certificates`
+                  : `Start ${selectedTiers.length} tiers`
                 : selectedTiers.length === 1
-                  ? `Start — ${selectedTiers[0].event.name}`
+                  ? dryRun
+                    ? `Generate ${totalRows} certificates`
+                    : `Start — ${selectedTiers[0].event.name}`
                   : "Select at least one tier"}
           </Button>
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { getJob, deleteJob, type Job, type JobRow } from "@/lib/api";
+import { getJob, deleteJob, jobDownloadUrl, type Job, type JobRow } from "@/lib/api";
 import { downloadCsv, rowsToRecordCsv } from "@/lib/csv";
 import { ResendPanel } from "@/components/ResendPanel";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -94,7 +94,11 @@ export default function JobDetailPage() {
   };
 
   const summary = [
-    { label: "Sent", value: job.sent_count, tone: "text-sage-ink" },
+    // A generate-only run sent nothing, so labelling its rows "Sent" would be
+    // false however many there are. total_rows is what it produced.
+    job.dry_run
+      ? { label: "Generated", value: job.total_rows, tone: "text-sage-ink" }
+      : { label: "Sent", value: job.sent_count, tone: "text-sage-ink" },
     { label: "Failed", value: job.failed_count, tone: "text-rose-ink" },
     { label: "Invalid", value: job.invalid_count, tone: "text-amber-ink" },
     { label: "Bounced", value: job.bounced_count, tone: "text-terra-ink" },
@@ -114,6 +118,14 @@ export default function JobDetailPage() {
         subtitle={`${new Date(job.created_at).toLocaleString()}${job.dry_run ? " · dry run" : ""}`}
         actions={
           <div className="flex gap-2">
+            {job.certificates_available && (
+              <a
+                href={jobDownloadUrl(job.id)}
+                className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[13px] font-medium transition-colors duration-150 hover:border-hair-hover hover:bg-surface-raised"
+              >
+                Download .zip
+              </a>
+            )}
             <Button
               variant="outline"
               size="sm"

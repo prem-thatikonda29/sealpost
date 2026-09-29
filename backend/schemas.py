@@ -85,6 +85,8 @@ class JobResponse(BaseModel):
     created_at: datetime
     finished_at: Optional[datetime]
     rows: List[JobRowResponse] = []
+    # Whether there is a zip to offer. Computed from disk, not stored.
+    certificates_available: bool = False
     # The config this job ran with, frozen at creation. Exposed so a retry can
     # rebuild it without needing the event to still exist — and so the original
     # message can prefill the retry's subject and body.

@@ -6,15 +6,19 @@ import asyncio
 import csv
 import io
 import json
+import os
 import shutil
+import tempfile
+import zipfile
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
+from starlette.background import BackgroundTask
 
 from ..database import get_db
 from ..models import Job, JobRow, Event
@@ -29,6 +33,7 @@ from ..schemas import (
     JobRowResponse,
     EmailValidationResult,
 )
+from .. import cert_engine
 from ..cert_engine import validate_inputs
 from .. import job_runner
 from ..email_validator import validate_format, validate_mx
@@ -300,6 +305,57 @@ async def job_progress(job_id: str, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# Downloading the certificates a job produced
+# ---------------------------------------------------------------------------
+
+@router.get("/{job_id}/download")
+def download_certificates(job_id: str, db: Session = Depends(get_db)):
+    """
+    Every certificate this job rendered, as one zip.
+
+    Works for any job — a generate-only run is the usual reason, but a sent run
+    has the same files on disk and the same claim to them.
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    directory = OUTPUT_DIR / job_id
+    files = sorted(p for p in directory.iterdir() if p.is_file()) if directory.is_dir() else []
+    if not files:
+        raise HTTPException(
+            status_code=404,
+            detail="This job has no certificates on disk. They are removed if the job is deleted.",
+        )
+
+    # The name is not a column — it is recorded in the snapshot, the same way
+    # list_jobs reads it.
+    name = "certificates"
+    if job.event_snapshot:
+        try:
+            name = json.loads(job.event_snapshot).get("name") or name
+        except ValueError:
+            pass
+
+    # Stored, not deflated: the PDFs are mostly JPEG, which is already
+    # compressed, so deflating spends CPU to save almost nothing.
+    tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    tmp.close()
+    with zipfile.ZipFile(tmp.name, "w", zipfile.ZIP_STORED) as archive:
+        for path in files:
+            archive.write(path, arcname=path.name)
+
+    return FileResponse(
+        tmp.name,
+        media_type="application/zip",
+        filename=f"{cert_engine.sanitize_name(name) or 'certificates'}.zip",
+        # Streaming it off disk rather than building 600MB in memory, then
+        # removing it once the response has been sent.
+        background=BackgroundTask(os.unlink, tmp.name),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Deleting jobs
 # ---------------------------------------------------------------------------
 
@@ -322,6 +378,12 @@ def _refuse_if_active(jobs) -> None:
                 f"would interrupt the sends partway through — wait for them to finish."
             ),
         )
+
+
+def _has_certificates(job_id: str) -> bool:
+    """Whether this job left anything on disk to download."""
+    directory = OUTPUT_DIR / job_id
+    return directory.is_dir() and any(directory.iterdir())
 
 
 def _discard_output(job_id: str) -> None:
@@ -407,4 +469,9 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job
+
+    # Whether a download is worth offering, so the button is not a link to a
+    # 404 for a job that rendered nothing.
+    response = JobResponse.model_validate(job)
+    response.certificates_available = _has_certificates(job_id)
+    return response

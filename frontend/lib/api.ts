@@ -47,6 +47,8 @@ export interface Job {
   created_at: string;
   finished_at?: string;
   rows?: JobRow[];
+  /** Whether this job left certificates on disk worth offering as a zip. */
+  certificates_available?: boolean;
   /**
    * The config this job ran with, frozen when it started. A re-send rebuilds
    * from this rather than from the event, so it works even for a job whose
@@ -213,6 +215,16 @@ export const deleteJob = (id: string) => api.delete(`/api/jobs/${id}`);
 
 /** Remove every job. All or nothing: a 409 means something was still running. */
 export const clearJobs = () => api.delete("/api/jobs");
+
+/**
+ * Every certificate this job rendered, as a zip.
+ *
+ * A plain URL rather than a request through axios: this is a file download, so
+ * it should go through the browser's own download handling — its folder, its
+ * "ask where to save" setting, its progress UI. Buffering 600MB through JS to
+ * hand back to the browser would only lose all of that.
+ */
+export const jobDownloadUrl = (id: string) => `${BASE}/api/jobs/${id}/download`;
 
 export const validateEmails = (emails: string[]) =>
   api

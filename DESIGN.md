@@ -70,6 +70,7 @@ One fixed mapping, used identically on every screen (dashboard, progress log, jo
 | Semantic | Accent | Fill | Text |
 |---|---|---|---|
 | success / sent / done / valid | sage | `#D9E2D4` | `#4A6340` |
+| generated (rendered, not emailed) | sage | `#D9E2D4` | `#4A6340` |
 | in progress / running | amber | `#F0E4CC` | `#7A5C1E` |
 | invalid / warning | amber | `#F0E4CC` | `#7A5C1E` |
 | bounced | terra | `#E8D5CC` | `#8A4A33` |
@@ -271,6 +272,18 @@ A job can be deleted on its own page, or the whole history cleared from the list
 **Clearing is all or nothing.** If anything is running, nothing is deleted — deleting the rest would leave the user unsure what survived.
 
 Two implementation traps, both pinned by tests. A bulk `db.query(Job).delete()` **bypasses the ORM cascade**, so the rows are deleted explicitly rather than orphaned. And `job_runner._queues` is a module-level dict, so a deleted job's queue is dropped with it instead of living for the life of the process.
+
+#### Generating without sending
+
+"Dry run" was a label that lied. `job_runner` wrapped the render *and* the send in `if not dry_run`, so the checkbox saying "generate the certificates but send nothing" generated nothing — it only ran the address check.
+
+It is now **Generate all and download**, and it does what it says: every certificate is rendered to `output/<job_id>/`, no SMTP connection is opened, rows report as `generated`, and `sent_count` stays at zero because nothing was sent. When it finishes, the zip is offered right there in the progress view, and again on the job page.
+
+This is not redundant with **Check exact output**, which is the reason it was worth making real. The editor previews *one* certificate for a name typed into a box. What actually goes wrong in a batch is specific names — a forty-character name shrinking to the floor, a glyph the chosen font does not carry, an empty cell — and none of those appear until the real CSV is run through. It is the only thing that tests the input that will actually be sent.
+
+The zip is built with `ZIP_STORED`, not deflated: the PDFs are mostly JPEG, so deflating spends CPU to save almost nothing. It streams off a temp file rather than being assembled in memory, because a thousand certificates is a few hundred megabytes, and the temp file is removed once the response has been sent.
+
+**Check exact output** remains for the editing loop — it is faster and it belongs next to the thing being edited.
 
 #### Check exact output
 
