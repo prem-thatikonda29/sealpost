@@ -27,8 +27,9 @@ const features = [
   },
   {
     icon: ArrowClockwise,
-    title: "Resume Support",
-    description: "Interrupt and restart anytime. Progress is tracked automatically",
+    title: "Re-send Failures",
+    description:
+      "Retry only the rows that missed out, with a message you can rewrite",
     color: "bg-accent-amber",
     textColor: "text-accent-amber-text",
   },
@@ -41,8 +42,9 @@ const features = [
   },
   {
     icon: ChartBarHorizontal,
-    title: "Dry Run Mode",
-    description: "Preview all generated PDFs without sending a single email",
+    title: "Generate & Download",
+    description:
+      "Produce every certificate and download the zip without sending an email",
     color: "bg-accent-sage",
     textColor: "text-accent-sage-text",
   },

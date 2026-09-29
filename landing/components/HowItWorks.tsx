@@ -5,21 +5,21 @@ import { useReveal } from "./useReveal";
 const steps = [
   {
     number: "01",
-    title: "Prepare",
+    title: "Create an event",
     description:
-      "Add participant CSVs and certificate templates to the data/ and templates/ directories",
+      "Upload a certificate template, click to place the name, pick a font, and write the email",
   },
   {
     number: "02",
-    title: "Generate",
+    title: "Upload & map your CSV",
     description:
-      "Run python run.py to overlay names on templates and create PDFs",
+      "Upload a CSV per tier and map its columns — names-only CSVs and split name columns work too",
   },
   {
     number: "03",
-    title: "Send",
+    title: "Send and watch",
     description:
-      "The same command emails each certificate via Gmail with progress tracking",
+      "Watch every row update live, catch bounces, and re-send only the people who missed out",
   },
 ];
 
@@ -56,22 +56,28 @@ export default function HowItWorks() {
         <div className="mt-12">
           <div className="bg-surface border border-border overflow-hidden transition-colors duration-150 hover:border-border-hover">
             <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
-              <span className="text-[11px] text-text-faint font-mono">terminal</span>
+              <span className="text-[11px] text-text-faint font-mono">run</span>
             </div>
             <pre className="p-4 overflow-x-auto">
               <code className="text-[13px] font-mono text-text leading-relaxed">
-                <span className="text-text-faint">$</span> python run.py winner
+                <span className="text-accent-sage-text">sent</span>
+                {"    priya@hackathon.dev"}
+                {"\n"}
+                <span className="text-accent-sage-text">sent</span>
+                {"    amir@hackathon.dev"}
+                {"\n"}
+                <span className="text-accent-rose-text">failed</span>
+                {"  rahul@hackathon.dev"}
+                {"\n"}
+                <span className="text-accent-amber-text">invalid</span>
+                {" sam@gmial.com"}
                 {"\n"}
                 <span className="text-text-muted">
-                  {"\n"}[winner] Processing batch 1/6 (100 certificates)
-                  {"\n"}[winner] Sent 100/573 emails
-                  {"\n"}[winner] Processing batch 2/6 (100 certificates)
-                  {"\n"}[winner] Sent 200/573 emails
-                  {"\n"}...
+                  {"\n"}  … and 570 more rows
                 </span>
                 {"\n"}
                 <span className="text-accent-sage-text">
-                  {"\n"}Done! Sent 573 certificates in 4m 32s
+                  {"\n"}  573 sent · 12 failed · 3 invalid
                 </span>
               </code>
             </pre>

@@ -10,14 +10,14 @@ export default function Hero() {
     <section id="hero" className="min-h-[100dvh] flex items-center">
       <div ref={ref} className="reveal w-full max-w-4xl mx-auto px-6 pt-24 pb-16">
         <p className="text-[11px] font-mono uppercase tracking-[0.15em] text-text-faint mb-6">
-          CLI Tool
+          Web App
         </p>
         <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl font-normal text-text leading-[1.05] tracking-[-0.03em]">
           Send hackathon certificates<br />in minutes
         </h1>
         <p className="mt-6 text-lg text-text-muted leading-relaxed max-w-[50ch]">
-          Generate personalized PDF certificates and email them to participants.
-          Built-in resume tracking and batch control.
+          Place names visually, upload a CSV, and watch every send land — or
+          fail — in real time.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row gap-3">
           <a
