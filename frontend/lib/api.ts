@@ -203,6 +203,17 @@ export const getJob = (id: string) =>
 
 export const listJobs = () => api.get<Job[]>("/api/jobs").then((r) => r.data);
 
+/**
+ * Remove a job, its rows, and the certificates it rendered.
+ *
+ * Refused with a 409 while the job is still running — its rows are being
+ * written in a loop that assumes they exist.
+ */
+export const deleteJob = (id: string) => api.delete(`/api/jobs/${id}`);
+
+/** Remove every job. All or nothing: a 409 means something was still running. */
+export const clearJobs = () => api.delete("/api/jobs");
+
 export const validateEmails = (emails: string[]) =>
   api
     .post<EmailValidation[]>("/api/jobs/validate-emails", { emails })

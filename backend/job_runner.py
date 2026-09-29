@@ -27,6 +27,16 @@ def get_queue(job_id: str) -> Optional[asyncio.Queue]:
     return _queues.get(job_id)
 
 
+def forget(job_id: str) -> None:
+    """Drop a job's event queue once the job is gone.
+
+    _queues is a module-level dict, so without this a long-lived process holds
+    a queue for every job it has ever run. An SSE consumer already reading the
+    old object simply stops receiving, which is correct for a deleted job.
+    """
+    _queues.pop(job_id, None)
+
+
 def _db_job(db: Session, job_id: str) -> Optional[Job]:
     return db.query(Job).filter(Job.id == job_id).first()
 

@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { getJob, type Job, type JobRow } from "@/lib/api";
+import { getJob, deleteJob, type Job, type JobRow } from "@/lib/api";
 import { downloadCsv, rowsToRecordCsv } from "@/lib/csv";
 import { ResendPanel } from "@/components/ResendPanel";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useNotify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
@@ -21,6 +23,8 @@ import {
 
 export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
+  const router = useRouter();
+  const notify = useNotify();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,12 +71,27 @@ export default function JobDetailPage() {
 
   const rows = job.rows ?? [];
 
-  /* Everything that did not get a certificate. A dry run's rows are "skipped",
+  /* Everything that didn't get a certificate. A dry run's rows are "skipped",
      which means nothing was attempted — not that it failed — so they are not
      here. */
   const undelivered = rows.filter((r) =>
     ["failed", "invalid_domain", "bounced"].includes(r.status)
   );
+
+  const handleDelete = async () => {
+    try {
+      await deleteJob(job.id);
+    } catch (e: any) {
+      // A 409 means the job is still running and nothing was deleted.
+      notify.error(
+        "Could not delete the job",
+        e?.response?.data?.detail ?? e?.message
+      );
+      return;
+    }
+    notify.success(`Deleted "${job.event_name ?? "job"}"`);
+    router.push("/history");
+  };
 
   const summary = [
     { label: "Sent", value: job.sent_count, tone: "text-sage-ink" },
@@ -122,6 +141,24 @@ export default function JobDetailPage() {
                 Export {undelivered.length} undelivered
               </Button>
             )}
+            <ConfirmDialog
+              triggerClassName="border border-border bg-card text-destructive hover:bg-rose hover:text-rose-ink"
+              title={`Delete this job?`}
+              description={
+                <>
+                  {rows.length} row{rows.length === 1 ? "" : "s"} and the{" "}
+                  certificates they generated are removed from disk. This cannot
+                  be undone.
+                  {job.status === "running" &&
+                    " This job is still running — deleting will be refused until it finishes."}
+                </>
+              }
+              confirmLabel="Delete job"
+              busyLabel="Deleting…"
+              onConfirm={handleDelete}
+            >
+              Delete
+            </ConfirmDialog>
           </div>
         }
       />

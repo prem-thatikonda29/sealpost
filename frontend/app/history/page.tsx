@@ -2,24 +2,82 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { listJobs, type Job } from "@/lib/api";
+import { listJobs, clearJobs, type Job } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useNotify } from "@/lib/notify";
 
 export default function HistoryPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const notify = useNotify();
 
-  useEffect(() => {
+  const load = () =>
     listJobs()
       .then(setJobs)
       .finally(() => setLoading(false));
+
+  useEffect(() => {
+    load();
   }, []);
+
+  const handleClear = async () => {
+    try {
+      await clearJobs();
+    } catch (e: any) {
+      // A 409 means something is still running, and the API says which way to
+      // resolve it. Nothing was deleted.
+      notify.error(
+        "Could not clear history",
+        e?.response?.data?.detail ?? e?.message
+      );
+      return;
+    }
+    notify.success("History cleared");
+    load();
+  };
+
+  const active = jobs.filter((j) => j.status === "running" || j.status === "pending");
 
   return (
     <div className="space-y-6">
-      <PageHeader title="History" subtitle="Past certificate jobs" />
+      <PageHeader
+        title="History"
+        subtitle="Past certificate jobs"
+        actions={
+          jobs.length > 0 ? (
+            <ConfirmDialog
+              triggerClassName="border border-border bg-card px-2.5 text-foreground hover:border-hair-hover hover:bg-surface-raised"
+              title={`Delete all ${jobs.length} jobs?`}
+              description={
+                <>
+                  Every job record, every row, and every certificate they
+                  generated are removed. This cannot be undone.
+                  {active.length > 0 && (
+                    <>
+                      {" "}
+                      <span className="font-medium text-foreground">
+                        {active.length}{" "}
+                        {active.length === 1 ? "job is" : "jobs are"} still
+                        running
+                      </span>{" "}
+                      — clearing will be refused until{" "}
+                      {active.length === 1 ? "it finishes" : "they finish"}.
+                    </>
+                  )}
+                </>
+              }
+              confirmLabel="Delete everything"
+              busyLabel="Deleting…"
+              onConfirm={handleClear}
+            >
+              Clear history
+            </ConfirmDialog>
+          ) : undefined
+        }
+      />
 
       {loading && (
         <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">

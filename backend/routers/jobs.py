@@ -6,6 +6,7 @@ import asyncio
 import csv
 import io
 import json
+import shutil
 from datetime import datetime
 from typing import List, Optional
 
@@ -17,6 +18,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from ..database import get_db
 from ..models import Job, JobRow, Event
+from ..paths import OUTPUT_DIR
 from ..schemas import (
     DuplicateCheckRequest,
     DuplicateCheckResult,
@@ -295,6 +297,77 @@ async def job_progress(job_id: str, db: Session = Depends(get_db)):
                 break
 
     return EventSourceResponse(event_generator())
+
+
+# ---------------------------------------------------------------------------
+# Deleting jobs
+# ---------------------------------------------------------------------------
+
+# A job in either of these states is still being written to by the runner, and
+# its rows are being updated in a loop that assumes they exist. Deleting one
+# mid-flight does not just lose history, it corrupts the job that is running.
+ACTIVE_STATUSES = ("pending", "running")
+
+
+def _refuse_if_active(jobs) -> None:
+    active = [j for j in jobs if j.status in ACTIVE_STATUSES]
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"{len(active)} job is still running. Deleting it now would "
+                f"interrupt the send partway through — wait for it to finish."
+                if len(active) == 1
+                else f"{len(active)} jobs are still running. Deleting them now "
+                f"would interrupt the sends partway through — wait for them to finish."
+            ),
+        )
+
+
+def _discard_output(job_id: str) -> None:
+    """Delete the certificates this job rendered.
+
+    Removing the record but leaving the PDFs behind would orphan files nothing
+    can reach — no screen lists them and nothing can name one. They are the
+    job's output, so they go with it.
+    """
+    shutil.rmtree(OUTPUT_DIR / job_id, ignore_errors=True)
+
+
+@router.delete("/{job_id}", status_code=204)
+def delete_job(job_id: str, db: Session = Depends(get_db)):
+    """Remove one job: its rows, its rendered certificates, and its queue."""
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    _refuse_if_active([job])
+
+    # Job.rows is cascade="all, delete-orphan", so the rows go with it.
+    db.delete(job)
+    db.commit()
+
+    job_runner.forget(job_id)
+    _discard_output(job_id)
+
+
+@router.delete("", status_code=204)
+def clear_jobs(db: Session = Depends(get_db)):
+    """Remove every job. All or nothing: if anything is still running, nothing is deleted."""
+    jobs = db.query(Job).all()
+    _refuse_if_active(jobs)
+
+    job_ids = [j.id for j in jobs]
+
+    # Deleted explicitly rather than by iterating db.delete(), because a bulk
+    # delete bypasses the ORM's cascade and would leave every row orphaned.
+    db.query(JobRow).delete()
+    db.query(Job).delete()
+    db.commit()
+
+    for job_id in job_ids:
+        job_runner.forget(job_id)
+        _discard_output(job_id)
 
 
 # ---------------------------------------------------------------------------

@@ -262,6 +262,16 @@ A job's job is not done when it finishes. Somebody always misses the mail, and t
 
 **Address edits are re-validated for free.** A corrected address goes through the same phase-1 MX check as any other send, so nothing needs to guard it separately.
 
+#### Deleting a job
+
+A job can be deleted on its own page, or the whole history cleared from the list. Both go through `ConfirmDialog`, and both remove the rendered certificates as well as the rows — leaving the PDFs would orphan files nothing can reach, since no screen lists them and nothing can name one.
+
+**A running job cannot be deleted.** Its rows are written in a loop that assumes they exist, so removing one mid-flight does not merely lose history, it corrupts the job that is still sending. The API returns 409 and names what is in the way.
+
+**Clearing is all or nothing.** If anything is running, nothing is deleted — deleting the rest would leave the user unsure what survived.
+
+Two implementation traps, both pinned by tests. A bulk `db.query(Job).delete()` **bypasses the ORM cascade**, so the rows are deleted explicitly rather than orphaned. And `job_runner._queues` is a module-level dict, so a deleted job's queue is dropped with it instead of living for the life of the process.
+
 #### Check exact output
 
 Beneath the canvas, a `<details>` disclosure mounts `CertPreview`, which POSTs to `/api/preview` and renders the true server-side PNG — same `fit_font` shrink, same Pillow shaping, same face. It is collapsed by default and mounted only once a template and a position exist, so opening it is never a dead end. The canvas above it updates per keystroke with no round-trip; this is the thing you open when the name is nearly right and you want to stop guessing.
