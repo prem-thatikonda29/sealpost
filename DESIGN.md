@@ -213,6 +213,8 @@ They are lines and not a box on purpose. `max_text_width` bounds the span horizo
 
 They brighten to full terra when `fittedSize < fontSize` — that is, when the limit is actually costing the user something — and a caption under the canvas says so in words and numbers (`96px → 42px`). The guides are editor-only and never reach the PDF. Drawn beneath the name so the type always reads on top of them.
 
+The line is full-strength terra with a **1px white halo** behind it. Both parts are load-bearing: the first version shipped at 45% terra on a 1px hairline and was effectively invisible against a cream template, and the halo is what keeps it readable where the artwork goes dark. Weight carries the state — 1px normally, 2px once the limit is biting.
+
 Near a template edge the limit runs off the canvas. Those lines clamp to the edge and switch from dashed to **solid**, which distinguishes "the boundary is exactly here" from "the boundary carries on past this edge". Without it, a name placed near an edge would silently show one guide and read as a bug.
 
 #### Check exact output

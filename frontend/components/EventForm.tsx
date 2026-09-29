@@ -146,6 +146,20 @@ function CertCanvas({
     { at: Math.min(containerW, rawRight), clipped: rawRight > containerW },
   ];
 
+  /* A 1px hairline at partial opacity disappears into a cream or busy
+     template — the first version of these guides shipped at 45% terra and was
+     effectively invisible. Two things fix it: full-strength terra, and a 1px
+     white halo behind the line so it stays readable where the artwork is dark.
+     The line thickens while the limit is actually biting, which is the state
+     worth noticing. */
+  const guideClass = (clipped: boolean) =>
+    [
+      "pointer-events-none absolute inset-y-0 transition-all duration-150",
+      "shadow-[0_0_0_1px_rgba(255,255,255,0.85)]",
+      atLimit || clipped ? "border-l-2" : "border-l",
+      clipped ? "border-solid border-terra-ink" : "border-dashed border-terra-ink",
+    ].join(" ");
+
   /* Centre is the keyboard equivalent of "where the pointer would have
      clicked" — the neutral starting point when nothing is placed yet. */
   const centre = () => ({
@@ -238,13 +252,7 @@ function CertCanvas({
             <div
               key={i}
               aria-hidden
-              className={`pointer-events-none absolute inset-y-0 border-l transition-colors duration-150 ${
-                g.clipped
-                  ? "border-solid border-terra-ink"
-                  : atLimit
-                    ? "border-dashed border-terra-ink"
-                    : "border-dashed border-terra-ink/45"
-              }`}
+              className={guideClass(g.clipped)}
               style={{ left: g.at }}
             />
           ))}
