@@ -1,3 +1,4 @@
+import { Loader2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { VariantProps } from "class-variance-authority";
 import type { badgeVariants } from "@/components/ui/badge";
@@ -7,6 +8,8 @@ type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 interface Meta {
   variant: BadgeVariant;
   label: string;
+  /** Still in flight. Gets a spinner, because a label alone reads as a result. */
+  active?: boolean;
 }
 
 /* The single status vocabulary. Every screen draws its status chips from here —
@@ -23,13 +26,36 @@ const STATUS: Record<string, Meta> = {
   invalid_domain: { variant: "warn", label: "Invalid domain" },
   bounced: { variant: "info", label: "Bounced" },
   skipped: { variant: "neutral", label: "Dry run" },
+  // row-level, in flight. These are streamed but never written to the row, so
+  // they appear live and never in history — which is why they are listed here
+  // anyway: the badge is still the one place a status becomes a colour.
+  generating: { variant: "neutral", label: "Generating", active: true },
+  sending: { variant: "neutral", label: "Sending", active: true },
 };
+
+/** Statuses that mean "this row is finished, one way or another". */
+const TERMINAL = new Set([
+  "sent",
+  "failed",
+  "invalid_domain",
+  "bounced",
+  "skipped",
+]);
+
+export const isTerminal = (status: string) => TERMINAL.has(status);
 
 export function statusMeta(status: string): Meta {
   return STATUS[status] ?? { variant: "neutral", label: status };
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const { variant, label } = statusMeta(status);
-  return <Badge variant={variant}>{label}</Badge>;
+  const { variant, label, active } = statusMeta(status);
+  return (
+    <Badge variant={variant}>
+      {active && (
+        <Loader2Icon aria-hidden className="animate-spin motion-reduce:animate-none" />
+      )}
+      {label}
+    </Badge>
+  );
 }

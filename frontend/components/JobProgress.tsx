@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Progress } from "@/components/ui/progress";
-import { StatusBadge } from "@/components/StatusBadge";
+import { StatusBadge, isTerminal } from "@/components/StatusBadge";
 
 interface RowState {
   index: number;
@@ -11,6 +11,13 @@ interface RowState {
   status: string;
   error?: string;
 }
+
+/**
+ * The job's live phase, in the order they happen. `validating` is the MX check
+ * over the whole list, which runs before the first email and so is the one
+ * stretch where nothing else is happening.
+ */
+type Phase = "validating" | "sending" | "bounce_check" | "done";
 
 interface DoneSummary {
   sent: number;
@@ -21,7 +28,7 @@ interface DoneSummary {
 
 export function JobProgress({ jobId, total }: { jobId: string; total: number }) {
   const [rows, setRows] = useState<Map<number, RowState>>(new Map());
-  const [phase, setPhase] = useState<"sending" | "bounce_check" | "done">("sending");
+  const [phase, setPhase] = useState<Phase>("validating");
   const [summary, setSummary] = useState<DoneSummary | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
@@ -46,8 +53,8 @@ export function JobProgress({ jobId, total }: { jobId: string; total: number }) 
           });
           return next;
         });
-      } else if (event.type === "phase" && event.phase === "bounce_check") {
-        setPhase("bounce_check");
+      } else if (event.type === "phase") {
+        setPhase(event.phase as Phase);
       } else if (event.type === "done") {
         setPhase("done");
         setSummary({
@@ -67,15 +74,22 @@ export function JobProgress({ jobId, total }: { jobId: string; total: number }) 
     };
   }, [jobId]);
 
-  const processed = Array.from(rows.values()).filter((r) => r.status !== "pending").length;
+  // Count only finished rows. A row streamed as "generating" or "sending" is
+  // in flight, and counting it would push the bar ahead of the work — then the
+  // bar would appear to stall as the real work caught up.
+  const processed = Array.from(rows.values()).filter((r) =>
+    isTerminal(r.status)
+  ).length;
   const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
 
   const statusLabel =
-    phase === "bounce_check"
-      ? "Checking for bounces…"
-      : phase === "done"
-        ? "Complete"
-        : "Processing";
+    phase === "validating"
+      ? "Checking addresses…"
+      : phase === "sending"
+        ? "Generating and sending"
+        : phase === "bounce_check"
+          ? "Checking for bounces…"
+          : "Complete";
 
   const summaryCells = summary
     ? [

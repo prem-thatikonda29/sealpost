@@ -206,24 +206,43 @@ def generate_certificate(
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
-    img = Image.open(resolve(template_path)).convert("RGBA")
+    src = Image.open(resolve(template_path))
+    # What the template already is decides what the composite becomes, and it
+    # only matters because of size. A JPEG template has been through lossy
+    # compression once, so re-encoding the composite as JPEG costs no quality
+    # that exists — the "lossless" PNG was faithfully preserving old JPEG
+    # artefacts, not pristine artwork. And img2pdf embeds a JPEG untouched,
+    # where a PNG is deflated into the PDF. On a 2000x1414 certificate that is
+    # 0.27MB against 0.50MB, and the attachment size is what the SMTP send
+    # spends its time on. A PNG template keeps PNG, so nothing is *newly* lossy.
+    source_format = (src.format or "").upper()
+
+    img = src.convert("RGBA")
 
     font = fit_font(name, font_size, max_text_width, font_path, font_style)
     _draw_name(img, name, text_position, font, font_color)
 
     rgb = img.convert("RGB")
 
-    # Write to a temp PNG then convert to PDF via img2pdf
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        tmp_png = tmp.name
+    # Write to a temp image, then let img2pdf wrap it.
+    as_jpeg = source_format == "JPEG"
+    with tempfile.NamedTemporaryFile(
+        suffix=".jpg" if as_jpeg else ".png", delete=False
+    ) as tmp:
+        tmp_img = tmp.name
 
     try:
-        rgb.save(tmp_png, "PNG")
-        with open(tmp_png, "rb") as img_f, open(output_path, "wb") as pdf_f:
+        if as_jpeg:
+            # 4:4:4 — no chroma subsampling, so coloured logo edges and
+            # signatures stay crisp. q95 is the top of Pillow's useful range.
+            rgb.save(tmp_img, "JPEG", quality=95, subsampling=0, optimize=True)
+        else:
+            rgb.save(tmp_img, "PNG")
+        with open(tmp_img, "rb") as img_f, open(output_path, "wb") as pdf_f:
             pdf_f.write(img2pdf.convert(img_f))
     finally:
-        if os.path.exists(tmp_png):
-            os.remove(tmp_png)
+        if os.path.exists(tmp_img):
+            os.remove(tmp_img)
 
     return output_path
 

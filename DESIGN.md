@@ -75,6 +75,9 @@ One fixed mapping, used identically on every screen (dashboard, progress log, jo
 | bounced | terra | `#E8D5CC` | `#8A4A33` |
 | failed / error / destructive | rose | `#EADADD` | `#8A4A5C` |
 | pending / skipped / dry run | neutral | `#EDE6DE` | `#6E6258` |
+| generating / sending (in flight) | neutral + spinner | `#EDE6DE` | `#6E6258` |
+
+The in-flight pair carries a spinner because the label alone reads as a result. They are the only statuses that are never written to a row — see **Watching a send** — so they appear live and never in history. `StatusBadge` also exports `isTerminal`, so callers do not re-derive which statuses mean "finished".
 
 Selection: `::selection` uses terra fill with terra text, as the landing does.
 
@@ -126,6 +129,24 @@ Three rules hold this together:
 - **The canvas mirrors the fit.** `fit_font` shrinks the name by 2px steps to a floor of 10 until it fits `max_text_width`. `lib/fonts.ts` reimplements that against an offscreen 2D context, measuring *ink* width (`actualBoundingBoxLeft + actualBoundingBoxRight`) the way Pillow's `getbbox` does — advance width differs by a few pixels that grow with size. Without this the canvas draws an un-fitted name that overflows while the PDF shrinks it.
 
 The canvas is the browser's text engine and the PDF is Pillow's, so they can be close but never identical. The canvas is therefore presented as an approximation, and "Check exact output" mounts `CertPreview` for the server's own render.
+
+### Watching a send
+
+A job is slow in a way that is invisible unless it is designed for. Measured on a real 2000×1414 certificate: **rendering is ~60ms, the SMTP send is ~8–33s.** The time is the attachment going upstream, and it varies with the connection rather than the work.
+
+So the stream reports three things it used to skip:
+
+- **`validating`.** The MX check runs over the whole list before the first email, so on a large list it is the longest stretch with no per-row activity at all. It gets its own phase.
+- **`generating`, then `sending`, per row.** Without them a row appears only once it is finished, so the slowest part of every row is a blank space where the recipient should be.
+- **`sending` as a phase**, marking the switch from checking to actually sending.
+
+The per-row states are **streamed, never persisted**. `JobRow.status` records outcomes only. Writing "generating" to the database would leave a row stuck there forever if the process died mid-render, and would force every "is this row finished?" check to learn two values that mean "not yet". `isTerminal` in `StatusBadge` is the one definition, and the progress bar counts only terminal rows — counting in-flight ones would push the bar ahead of the work and make it appear to stall.
+
+#### Why the attachment is the size it is
+
+The PDF's size is the send's whole cost, so the image format inside it matters more than it looks. The composite is encoded to match the template: **a JPEG template produces a JPEG in the PDF, a PNG template stays PNG.**
+
+That is not a compromise, it is the honest reading of what the file already is. A JPEG template has been through lossy compression once, so re-encoding as JPEG costs no quality that exists — the lossless PNG was faithfully preserving old JPEG artefacts. And `img2pdf` embeds a JPEG untouched where it must deflate a PNG. On the real certificate: **0.50MB as PNG against 0.29MB as JPEG**, 0.67MB against 0.38MB on the wire, and JPEG encoding is also ~4× faster to produce (60ms against 238ms). A PNG template keeps PNG, so nothing becomes lossy that was not.
 
 ## Geometry
 

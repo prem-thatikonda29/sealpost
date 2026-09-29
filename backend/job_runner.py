@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .models import Job, JobRow
+from .paths import OUTPUT_DIR
 from . import cert_engine, email_validator, mailer
 
 # job_id → asyncio.Queue of SSE event dicts
@@ -73,6 +74,11 @@ async def run_job(
         # ------------------------------------------------------------------
         # Phase 1 — Pre-flight DNS MX validation
         # ------------------------------------------------------------------
+        # Every row is checked before the first email goes out, so on a large
+        # list this is a long stretch with nothing else to show. Announce it
+        # rather than leaving the UI on "Processing" with an empty list.
+        _push(job_id, {"type": "phase", "phase": "validating"})
+
         loop = asyncio.get_event_loop()
         valid_indices: List[int] = []  # row indices that passed validation
 
@@ -123,8 +129,14 @@ async def run_job(
                                "invalid": job.invalid_count, "bounced": 0})
                 return
 
-        output_dir = os.path.join("output", job_id)
+        # Resolved against the repo root, not the process's working directory.
+        # As a bare "output/" this wrote wherever uvicorn happened to have been
+        # started from, which is the same trap paths.py exists to close for
+        # uploads and fonts.
+        output_dir = str(OUTPUT_DIR / job_id)
         os.makedirs(output_dir, exist_ok=True)
+
+        _push(job_id, {"type": "phase", "phase": "sending"})
 
         template_path = event_config.get("template_path", "")
         text_position = (
@@ -144,8 +156,22 @@ async def run_job(
             safe_name = cert_engine.sanitize_name(name)
             pdf_path = os.path.join(output_dir, f"{safe_name}_{row_idx}.pdf")
 
+            # Transient states, streamed but never written to the row. The
+            # database records outcomes; a row interrupted mid-render would
+            # otherwise sit at "generating" forever, and every "is this row
+            # done?" check would have to learn two values that mean "not yet".
+            # Rendering is ~60ms and the send is seconds, so without these the
+            # whole wait is one blank space where the recipient should be.
+            row_event = {
+                "type": "row",
+                "index": row_idx,
+                "name": name,
+                "email": email,
+            }
+
             try:
                 if not dry_run:
+                    _push(job_id, {**row_event, "status": "generating"})
                     await loop.run_in_executor(
                         None,
                         lambda n=name, p=pdf_path: cert_engine.generate_certificate(
@@ -160,6 +186,7 @@ async def run_job(
                             max_text_width=event_config.get("max_text_width", 1400),
                         ),
                     )
+                    _push(job_id, {**row_event, "status": "sending"})
                     await loop.run_in_executor(
                         None,
                         lambda e=email, p=pdf_path, n=name: mailer.send_certificate(
@@ -176,13 +203,7 @@ async def run_job(
                 db.commit()
                 job.sent_count = (job.sent_count or 0) + 1
                 db.commit()
-                _push(job_id, {
-                    "type": "row",
-                    "index": row_idx,
-                    "name": name,
-                    "email": email,
-                    "status": db_row.status,
-                })
+                _push(job_id, {**row_event, "status": db_row.status})
 
             except Exception as exc:
                 db_row.status = "failed"
