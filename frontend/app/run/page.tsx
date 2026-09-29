@@ -2,9 +2,16 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { getEvents, createJob, type Event } from "@/lib/api";
+import {
+  getEvents,
+  createJob,
+  checkDuplicates,
+  type Event,
+  type DuplicateRecipient,
+} from "@/lib/api";
 import { CsvUploader, type CsvRow } from "@/components/CsvUploader";
 import { JobProgress } from "@/components/JobProgress";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,6 +35,21 @@ interface TierSetup {
   emailBody: string;
 }
 
+/** One tier's worth of "these people have had this already". */
+interface DupeWarning {
+  eventName: string;
+  checked: number;
+  already: number;
+  scoped: boolean;
+  sample: DuplicateRecipient[];
+}
+
+const describe = (e: any, fallback: string) =>
+  e?.response?.data?.detail ?? e?.message ?? fallback;
+
+/** Only the first few are named; past that the count is the message. */
+const SAMPLE_SIZE = 5;
+
 function RunPageInner() {
   const searchParams = useSearchParams();
   const preselect = searchParams.get("event");
@@ -39,6 +61,7 @@ function RunPageInner() {
   const [runningJobs, setRunningJobs] = useState<TierJob[] | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dupeWarnings, setDupeWarnings] = useState<DupeWarning[] | null>(null);
 
   useEffect(() => {
     getEvents()
@@ -86,30 +109,71 @@ function RunPageInner() {
   const handleStart = async () => {
     setStarting(true);
     setError(null);
-    const jobs: TierJob[] = [];
     try {
-      for (const tier of selectedTiers) {
-        const config = {
-          event_id: tier.event.id,
-          email_subject: tier.emailSubject,
-          email_body: tier.emailBody,
-          dry_run: dryRun,
-          batch_size: batchSize,
-          name_col: "name",
-          email_col: "email",
-        };
-        const { job_id } = await createJob(config, tier.csvFile!);
-        jobs.push({
-          jobId: job_id,
-          eventName: tier.event.name,
-          total: tier.csvRows?.length ?? 0,
-        });
+      // Anything these people have already been sent has to surface *before*
+      // the first job starts. Checking afterwards would be a report, not a
+      // warning.
+      const warnings = await collectDuplicates();
+      if (warnings.length > 0) {
+        setDupeWarnings(warnings);
+        return;
       }
-      setRunningJobs(jobs);
+      await startJobs();
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? e?.message ?? "Failed to start job");
+      setError(describe(e, "Failed to start job"));
     } finally {
       setStarting(false);
+    }
+  };
+
+  /** Per tier, how many of its addresses have already had this certificate. */
+  const collectDuplicates = async (): Promise<DupeWarning[]> => {
+    const warnings: DupeWarning[] = [];
+    for (const tier of selectedTiers) {
+      const emails = (tier.csvRows ?? []).map((r) => r.email).filter(Boolean);
+      if (emails.length === 0) continue;
+      const res = await checkDuplicates(tier.event.id, emails);
+      if (res.already_sent > 0) {
+        warnings.push({
+          eventName: tier.event.name,
+          checked: res.checked,
+          already: res.already_sent,
+          scoped: res.scoped_to_event,
+          sample: res.sample,
+        });
+      }
+    }
+    return warnings;
+  };
+
+  const startJobs = async () => {
+    const jobs: TierJob[] = [];
+    for (const tier of selectedTiers) {
+      const config = {
+        event_id: tier.event.id,
+        email_subject: tier.emailSubject,
+        email_body: tier.emailBody,
+        dry_run: dryRun,
+        batch_size: batchSize,
+        name_col: "name",
+        email_col: "email",
+      };
+      const { job_id } = await createJob(config, tier.csvFile!);
+      jobs.push({
+        jobId: job_id,
+        eventName: tier.event.name,
+        total: tier.csvRows?.length ?? 0,
+      });
+    }
+    setRunningJobs(jobs);
+  };
+
+  const confirmDuplicates = async () => {
+    setError(null);
+    try {
+      await startJobs();
+    } catch (e: any) {
+      setError(describe(e, "Failed to start job"));
     }
   };
 
@@ -353,6 +417,48 @@ function RunPageInner() {
                   ? `Start — ${selectedTiers[0].event.name}`
                   : "Select at least one tier"}
           </Button>
+
+          {/* The only thing standing between a test run and emailing everyone
+              twice. It warns rather than blocks: a re-send is legitimate when
+              someone lost the mail or a correction went out — it just should
+              not be possible to do it by accident. */}
+          <ConfirmDialog
+            open={dupeWarnings !== null}
+            onOpenChange={(next) => {
+              if (!next) setDupeWarnings(null);
+            }}
+            title="Some of these people already have this certificate"
+            description={`Sending now means they receive a second copy. Nothing has been sent yet — cancelling leaves the run untouched.`}
+            body={
+              <ul className="max-h-56 space-y-3 overflow-y-auto">
+                {dupeWarnings?.map((w) => (
+                  <li key={w.eventName}>
+                    <p className="text-[13px] font-medium">{w.eventName}</p>
+                    <p className="text-[13px] text-muted-foreground">
+                      {w.already} of {w.checked}{" "}
+                      {w.scoped
+                        ? "already received this certificate"
+                        : "have been sent a certificate before"}
+                    </p>
+                    {w.sample.length > 0 && (
+                      <p className="mt-1 font-mono text-[12px] leading-relaxed text-muted-foreground">
+                        {w.sample
+                          .slice(0, SAMPLE_SIZE)
+                          .map((s) => s.email)
+                          .join(", ")}
+                        {w.already > SAMPLE_SIZE &&
+                          ` and ${w.already - SAMPLE_SIZE} more`}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            }
+            confirmLabel="Send anyway"
+            confirmVariant="default"
+            busyLabel="Starting…"
+            onConfirm={confirmDuplicates}
+          />
         </>
       )}
     </div>

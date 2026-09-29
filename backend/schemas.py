@@ -130,6 +130,33 @@ class EmailValidationResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Duplicate recipient check
+# ---------------------------------------------------------------------------
+
+class DuplicateCheckRequest(BaseModel):
+    # None for a job with no saved event. That is not hypothetical: the FK is
+    # ON DELETE SET NULL, and every job recorded before events existed carries
+    # no event_id. Those still need checking — there is just nothing to scope to.
+    event_id: Optional[str] = None
+    emails: List[str]
+
+
+class DuplicateRecipient(BaseModel):
+    email: str
+    name: str
+    sent_at: Optional[datetime] = None
+
+
+class DuplicateCheckResult(BaseModel):
+    checked: int              # distinct addresses looked up
+    already_sent: int         # how many of those already had this certificate
+    # Whether the check was confined to one event. When it was not, the result
+    # can only say "sent something before", and the wording must not claim more.
+    scoped_to_event: bool
+    sample: List[DuplicateRecipient]   # a few, so the warning can name names
+
+
+# ---------------------------------------------------------------------------
 # Preview request
 # ---------------------------------------------------------------------------
 

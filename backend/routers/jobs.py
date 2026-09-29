@@ -11,12 +11,22 @@ from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from ..database import get_db
 from ..models import Job, JobRow, Event
-from ..schemas import JobCreate, JobResponse, JobListItem, JobRowResponse, EmailValidationResult
+from ..schemas import (
+    DuplicateCheckRequest,
+    DuplicateCheckResult,
+    DuplicateRecipient,
+    JobCreate,
+    JobResponse,
+    JobListItem,
+    JobRowResponse,
+    EmailValidationResult,
+)
 from ..cert_engine import validate_inputs
 from .. import job_runner
 from ..email_validator import validate_format, validate_mx
@@ -41,6 +51,73 @@ async def validate_emails(body: dict):
         valid, reason = await loop.run_in_executor(None, validate_mx, email)
         results.append(EmailValidationResult(email=email, valid=valid, reason=reason))
     return results
+
+
+# ---------------------------------------------------------------------------
+# Duplicate recipient check
+# ---------------------------------------------------------------------------
+
+@router.post("/check-duplicates", response_model=DuplicateCheckResult)
+def check_duplicates(body: DuplicateCheckRequest, db: Session = Depends(get_db)):
+    """
+    Which of these addresses have already been sent a certificate for this event?
+
+    A job is the only thing in this app that emails anyone, and until now
+    nothing ever looked at the jobs that had already run — so sending the same
+    CSV twice was silent, and the second send was indistinguishable from the
+    first until it had happened. This does not block: re-sending is legitimate
+    when someone lost the mail or a correction went out. It makes the re-send
+    deliberate instead of accidental.
+
+    Only `sent` counts as delivered — a bounced or failed row never reached
+    anyone, so those are not duplicates. Dry runs are excluded because they send
+    nothing.
+
+    Scoped to the event when there is one: the same list receiving two
+    *different* certificates is normal, and warning about it would train the
+    user to click through. When there is no event to scope by — a one-off job,
+    or one whose event was deleted — the only answerable question is whether
+    these addresses have been sent a certificate at all, so that is the one
+    asked, and `scoped_to_event` says so rather than letting the caller imply
+    more than the check knows.
+    """
+    emails = {e.strip().lower() for e in body.emails if e.strip()}
+    if not emails:
+        return DuplicateCheckResult(
+            checked=0, already_sent=0, scoped_to_event=bool(body.event_id), sample=[]
+        )
+
+    filters = [
+        Job.dry_run.is_(False),
+        JobRow.status == "sent",
+        func.lower(JobRow.email).in_(emails),
+    ]
+    if body.event_id:
+        filters.append(Job.event_id == body.event_id)
+
+    rows = (
+        db.query(JobRow.email, JobRow.name, Job.finished_at)
+        .join(Job, Job.id == JobRow.job_id)
+        .filter(*filters)
+        .all()
+    )
+
+    # Someone in two past jobs has two rows; keep the most recent, so the
+    # warning can say when they last got one.
+    rows.sort(key=lambda r: r[2] or datetime.min, reverse=True)
+    seen: dict[str, DuplicateRecipient] = {}
+    for email, name, finished_at in rows:
+        seen.setdefault(
+            email.lower(),
+            DuplicateRecipient(email=email, name=name, sent_at=finished_at),
+        )
+
+    return DuplicateCheckResult(
+        checked=len(emails),
+        already_sent=len(seen),
+        scoped_to_event=bool(body.event_id),
+        sample=list(seen.values())[:8],
+    )
 
 
 # ---------------------------------------------------------------------------

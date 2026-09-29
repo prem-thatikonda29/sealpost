@@ -83,6 +83,26 @@ export interface EmailValidation {
   reason: string;
 }
 
+export interface DuplicateRecipient {
+  email: string;
+  name: string;
+  sent_at?: string;
+}
+
+export interface DuplicateCheck {
+  /** Distinct addresses looked up. */
+  checked: number;
+  /** How many of those already received a certificate for this event. */
+  already_sent: number;
+  /**
+   * Whether the check was confined to one event. When false it can only say
+   * "sent something before", and the copy must not claim more.
+   */
+  scoped_to_event: boolean;
+  /** A few of them, so the warning can name names rather than only count. */
+  sample: DuplicateRecipient[];
+}
+
 // ─── Events ───────────────────────────────────────────────────────────────────
 
 export const getEvents = () => api.get<Event[]>("/api/events").then((r) => r.data);
@@ -179,4 +199,21 @@ export const listJobs = () => api.get<Job[]>("/api/jobs").then((r) => r.data);
 export const validateEmails = (emails: string[]) =>
   api
     .post<EmailValidation[]>("/api/jobs/validate-emails", { emails })
+    .then((r) => r.data);
+
+/**
+ * Which of these addresses have already had a certificate for this event.
+ *
+ * Called before a job starts, not as part of it — the answer decides whether the
+ * user is asked to confirm, so it has to arrive before anything is sent.
+ *
+ * `eventId` may be empty for a job with no saved event. The check then widens
+ * to every past send, and says so.
+ */
+export const checkDuplicates = (eventId: string | null | undefined, emails: string[]) =>
+  api
+    .post<DuplicateCheck>("/api/jobs/check-duplicates", {
+      event_id: eventId || null,
+      emails,
+    })
     .then((r) => r.data);

@@ -217,6 +217,18 @@ The line is full-strength terra with a **1px white halo** behind it. Both parts 
 
 Near a template edge the limit runs off the canvas. Those lines clamp to the edge and switch from dashed to **solid**, which distinguishes "the boundary is exactly here" from "the boundary carries on past this edge". Without it, a name placed near an edge would silently show one guide and read as a bug.
 
+### Before a send
+
+Starting a run is the only irreversible thing in the app — everything else can be undone, and what a send does cannot. So it gets a check the rest of the app doesn't: `POST /api/jobs/check-duplicates` runs *before* the first job is created, and if any address in the CSV has already been sent a certificate, `ConfirmDialog` asks.
+
+**Warn, don't block.** Re-sending is legitimate when someone lost the mail or a correction went out. The goal is that it cannot happen by *accident*, not that it is impossible.
+
+Scoping is the subtle part. With a saved event the check is confined to that event, because the same list receiving two *different* certificates is normal and warning about it would train the user to click through. Without one it widens to every past send — which is not hypothetical: the FK is `ON DELETE SET NULL`, so a job outlives its event, and every job recorded before events existed carries no `event_id` at all. `scoped_to_event` comes back in the response so the copy can say "already received this certificate" or the weaker "have been sent a certificate before" rather than implying more than the check knows.
+
+Only `sent` counts as delivered: a bounced or failed row reached nobody, so re-sending to it is the correct thing to do, and a dry run sends nothing.
+
+And a failed check never becomes a send. If the lookup errors, the run stops and says so — an unreachable check must not read as "no duplicates".
+
 #### Check exact output
 
 Beneath the canvas, a `<details>` disclosure mounts `CertPreview`, which POSTs to `/api/preview` and renders the true server-side PNG — same `fit_font` shrink, same Pillow shaping, same face. It is collapsed by default and mounted only once a template and a position exist, so opening it is never a dead end. The canvas above it updates per keystroke with no round-trip; this is the thing you open when the name is nearly right and you want to stop guessing.
