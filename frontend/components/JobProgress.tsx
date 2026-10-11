@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Progress } from "@/components/ui/progress";
+import { EmailText, EmailToggle } from "@/components/EmailToggle";
 import { StatusBadge, isTerminal } from "@/components/StatusBadge";
 
 interface RowState {
@@ -45,6 +46,7 @@ export function JobProgress({
   const [phase, setPhase] = useState<Phase>(
     dryRun ? "generating" : "validating"
   );
+  const [showEmails, setShowEmails] = useState(false);
   const [summary, setSummary] = useState<DoneSummary | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
@@ -176,7 +178,13 @@ export function JobProgress({
                     Name
                   </th>
                   <th className="label-mono px-3 py-2 text-left font-medium">
-                    Email
+                    <span className="inline-flex items-center gap-2">
+                      Email
+                      <EmailToggle
+                        shown={showEmails}
+                        onToggle={() => setShowEmails((s) => !s)}
+                      />
+                    </span>
                   </th>
                   <th className="label-mono px-3 py-2 text-left font-medium">
                     Status
@@ -196,7 +204,7 @@ export function JobProgress({
                       </td>
                       <td className="px-3 py-1.5 text-[13px]">{row.name}</td>
                       <td className="px-3 py-1.5 font-mono text-[12px]">
-                        {row.email}
+                        <EmailText email={row.email} shown={showEmails} />
                       </td>
                       <td className="px-3 py-1.5">
                         <StatusBadge status={row.status} />
