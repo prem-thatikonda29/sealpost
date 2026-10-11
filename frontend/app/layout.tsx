@@ -23,7 +23,7 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "Cert Sender",
+  title: "Sealpost",
   description: "Certificate generation and email sending",
 };
 

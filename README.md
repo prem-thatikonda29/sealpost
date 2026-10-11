@@ -1,4 +1,4 @@
-# Cert Sender
+# Sealpost
 
 Browser-based certificate generation and email sending tool. Upload templates, position names visually, upload participant CSVs, and send certificates with real-time progress. No terminal required.
 
@@ -23,8 +23,8 @@ Browser-based certificate generation and email sending tool. Upload templates, p
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/prem-thatikonda29/Certificates-Sender.git
-cd Certificates-Sender
+git clone https://github.com/prem-thatikonda29/sealpost.git
+cd sealpost
 cp .env.example .env
 ```
 

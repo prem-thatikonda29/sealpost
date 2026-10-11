@@ -22,7 +22,7 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "cert-sender - Hackathon Certificates in Minutes",
+  title: "Sealpost - Hackathon Certificates in Minutes",
   description:
     "A Python CLI tool that generates personalized PDF certificates and emails them to participants.",
 };
