@@ -27,6 +27,3 @@ frontend/.env.local
 # OS
 .DS_Store
 *.zip
-
-# Real-send demo list: addresses pointing at the owner's own inbox
-demo/live-send.csv
