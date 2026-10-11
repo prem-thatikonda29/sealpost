@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createJob, type Job, type JobRow } from "@/lib/api";
 import { csvFile, downloadCsv, rowsToRecordCsv } from "@/lib/csv";
+import { EmailText } from "@/components/EmailToggle";
 import { JobProgress } from "@/components/JobProgress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,16 @@ const describeAddress = (status: string) =>
     ? "the mail was returned as undeliverable"
     : "the domain has no mail records";
 
-export function ResendPanel({ job, rows }: { job: Job; rows: JobRow[] }) {
+export function ResendPanel({
+  job,
+  rows,
+  showEmails = false,
+}: {
+  job: Job;
+  rows: JobRow[];
+  /** Follows the toggle on the page's row table, so one switch covers both. */
+  showEmails?: boolean;
+}) {
   const snapshot = job.event_snapshot;
 
   const retryable = rows.filter((r) => RETRYABLE.includes(r.status));
@@ -125,7 +135,7 @@ export function ResendPanel({ job, rows }: { job: Job; rows: JobRow[] }) {
                 <ul className="space-y-0.5 font-mono text-[12px] text-amber-ink">
                   {addressProblems.slice(0, 5).map((r) => (
                     <li key={r.id}>
-                      {r.email} — {describeAddress(r.status)}
+                      <EmailText email={r.email} shown={showEmails} /> — {describeAddress(r.status)}
                     </li>
                   ))}
                   {addressProblems.length > 5 && (

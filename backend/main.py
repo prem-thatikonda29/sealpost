@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Cert Sender API",
+    title="Sealpost API",
     version="2.0.0",
     lifespan=lifespan,
 )

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { Fragment, useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   getEvents,
@@ -11,6 +11,7 @@ import {
   type DuplicateRecipient,
 } from "@/lib/api";
 import { CsvUploader, type CsvMapping, type CsvRow } from "@/components/CsvUploader";
+import { EmailText, EmailToggle } from "@/components/EmailToggle";
 import { JobProgress } from "@/components/JobProgress";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ function RunPageInner() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dupeWarnings, setDupeWarnings] = useState<DupeWarning[] | null>(null);
+  const [showDupeEmails, setShowDupeEmails] = useState(false);
 
   useEffect(() => {
     getEvents()
@@ -493,34 +495,48 @@ function RunPageInner() {
           <ConfirmDialog
             open={dupeWarnings !== null}
             onOpenChange={(next) => {
-              if (!next) setDupeWarnings(null);
+              if (!next) {
+                setDupeWarnings(null);
+                setShowDupeEmails(false);
+              }
             }}
             title="Some of these people already have this certificate"
             description={`Sending now means they receive a second copy. Nothing has been sent yet — cancelling leaves the run untouched.`}
             body={
-              <ul className="max-h-56 space-y-3 overflow-y-auto">
-                {dupeWarnings?.map((w) => (
-                  <li key={w.eventName}>
-                    <p className="text-[13px] font-medium">{w.eventName}</p>
-                    <p className="text-[13px] text-muted-foreground">
-                      {w.already} of {w.checked}{" "}
-                      {w.scoped
-                        ? "already received this certificate"
-                        : "have been sent a certificate before"}
-                    </p>
-                    {w.sample.length > 0 && (
-                      <p className="mt-1 font-mono text-[12px] leading-relaxed text-muted-foreground">
-                        {w.sample
-                          .slice(0, SAMPLE_SIZE)
-                          .map((s) => s.email)
-                          .join(", ")}
-                        {w.already > SAMPLE_SIZE &&
-                          ` and ${w.already - SAMPLE_SIZE} more`}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="label-mono">Emails</span>
+                  <EmailToggle
+                    shown={showDupeEmails}
+                    onToggle={() => setShowDupeEmails((s) => !s)}
+                  />
+                </div>
+                <ul className="max-h-56 space-y-3 overflow-y-auto">
+                  {dupeWarnings?.map((w) => (
+                    <li key={w.eventName}>
+                      <p className="text-[13px] font-medium">{w.eventName}</p>
+                      <p className="text-[13px] text-muted-foreground">
+                        {w.already} of {w.checked}{" "}
+                        {w.scoped
+                          ? "already received this certificate"
+                          : "have been sent a certificate before"}
                       </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                      {w.sample.length > 0 && (
+                        <p className="mt-1 font-mono text-[12px] leading-relaxed text-muted-foreground">
+                          {w.sample.slice(0, SAMPLE_SIZE).map((s, i) => (
+                            <Fragment key={s.email}>
+                              {i > 0 && ", "}
+                              <EmailText email={s.email} shown={showDupeEmails} />
+                            </Fragment>
+                          ))}
+                          {w.already > SAMPLE_SIZE &&
+                            ` and ${w.already - SAMPLE_SIZE} more`}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             }
             confirmLabel="Send anyway"
             confirmVariant="default"

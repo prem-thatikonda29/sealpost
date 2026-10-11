@@ -17,7 +17,7 @@ export default function MobileNav() {
   return (
     <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-canvas/80 backdrop-blur-sm border-b border-border">
       <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-sm font-medium text-text">cert-sender</span>
+        <span className="text-sm font-medium text-text">Sealpost</span>
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-1 text-text-muted hover:text-text"

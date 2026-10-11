@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { EmailText, EmailToggle } from "@/components/EmailToggle";
 import { validateEmails, type EmailValidation } from "@/lib/api";
 
 export interface CsvRow {
@@ -75,12 +76,16 @@ export function CsvUploader({ onReady }: Props) {
   const [emailCol, setEmailCol] = useState("");
   const [validation, setValidation] = useState<Record<string, EmailValidation>>({});
   const [validating, setValidating] = useState(false);
+  // Addresses are personal data and this table is often on a shared screen, so
+  // they stay hidden until the user asks. Reset on each upload.
+  const [showEmails, setShowEmails] = useState(false);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
     setValidation({});
+    setShowEmails(false);
 
     Papa.parse<Record<string, string>>(f, {
       header: true,
@@ -265,7 +270,13 @@ export function CsvUploader({ onReady }: Props) {
                     {emailCol && (
                       <>
                         <th className="label-mono px-3 py-2 text-left font-medium">
-                          Email
+                          <span className="inline-flex items-center gap-2">
+                            Email
+                            <EmailToggle
+                              shown={showEmails}
+                              onToggle={() => setShowEmails((s) => !s)}
+                            />
+                          </span>
                         </th>
                         <th className="label-mono px-3 py-2 text-left font-medium">
                           Domain
@@ -292,7 +303,7 @@ export function CsvUploader({ onReady }: Props) {
                         {emailCol && (
                           <>
                             <td className="px-3 py-1.5 font-mono text-[12px]">
-                              {row[emailCol] ?? ""}
+                              <EmailText email={row[emailCol]} shown={showEmails} />
                             </td>
                             <td className="px-3 py-1.5 text-[12px]">
                               {v ? (

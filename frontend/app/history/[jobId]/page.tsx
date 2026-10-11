@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getJob, deleteJob, jobDownloadUrl, type Job, type JobRow } from "@/lib/api";
 import { downloadCsv, rowsToRecordCsv } from "@/lib/csv";
+import { EmailText, EmailToggle } from "@/components/EmailToggle";
 import { ResendPanel } from "@/components/ResendPanel";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useNotify } from "@/lib/notify";
@@ -27,6 +28,7 @@ export default function JobDetailPage() {
   const notify = useNotify();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showEmails, setShowEmails] = useState(false);
 
   useEffect(() => {
     getJob(jobId)
@@ -190,7 +192,7 @@ export default function JobDetailPage() {
           between two job pages reuses this component, and the subject and body
           are seeded from the snapshot — without the key they would carry the
           previous job's message across. */}
-      <ResendPanel key={job.id} job={job} rows={rows} />
+      <ResendPanel key={job.id} job={job} rows={rows} showEmails={showEmails} />
 
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-hair-hover px-6 py-12 text-center">
@@ -205,7 +207,15 @@ export default function JobDetailPage() {
               <TableRow className="hover:bg-muted">
                 <TableHead className="w-14">#</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>
+                  <span className="inline-flex items-center gap-2">
+                    Email
+                    <EmailToggle
+                      shown={showEmails}
+                      onToggle={() => setShowEmails((s) => !s)}
+                    />
+                  </span>
+                </TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Note</TableHead>
               </TableRow>
@@ -218,7 +228,7 @@ export default function JobDetailPage() {
                   </TableCell>
                   <TableCell>{row.name}</TableCell>
                   <TableCell className="font-mono text-[12px]">
-                    {row.email}
+                    <EmailText email={row.email} shown={showEmails} />
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={row.status} />

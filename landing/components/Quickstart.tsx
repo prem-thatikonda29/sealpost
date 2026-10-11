@@ -21,7 +21,7 @@ export default function Quickstart() {
               Installation
             </h3>
             <CodeBlock
-              code={`git clone https://github.com/prem-thatikonda29/Certificates-Sender.git\ncd Certificates-Sender\npip install -r backend/requirements.txt\ncd frontend && npm install`}
+              code={`git clone https://github.com/prem-thatikonda29/sealpost.git\ncd sealpost\npip install -r backend/requirements.txt\ncd frontend && npm install`}
               label="terminal"
             />
           </div>

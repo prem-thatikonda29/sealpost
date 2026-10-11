@@ -20,7 +20,7 @@ export function Nav() {
           href="/events"
           className="font-serif text-base tracking-[-0.02em] text-foreground shrink-0"
         >
-          cert-sender
+          Sealpost
         </Link>
 
         <nav className="flex items-center gap-1" aria-label="Sections">

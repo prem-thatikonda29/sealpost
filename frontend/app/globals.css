@@ -3,7 +3,7 @@
 @import "shadcn/tailwind.css";
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   cert-sender — design tokens
+   Sealpost — design tokens
 
    Inherited from landing/app/globals.css. The landing page is the committed
    brand; this file maps its palette onto shadcn's variable names so the ui/
