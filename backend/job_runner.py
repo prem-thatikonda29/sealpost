@@ -138,6 +138,8 @@ async def run_job(
 
             valid_indices = []
             for row_idx, row in enumerate(rows_to_process):
+                if row.get("duplicate_of") is not None:
+                    continue  # already marked skipped when the job was created
                 db_row = db.query(JobRow).filter(
                     JobRow.job_id == job_id, JobRow.row_index == row_idx
                 ).first()

@@ -1,4 +1,6 @@
 import asyncio
+import io
+import json
 import smtplib
 from types import SimpleNamespace
 
@@ -188,3 +190,71 @@ def test_dropped_connection_is_closed_before_reconnect(env, monkeypatch):
     assert closed == [conns[0]]                    # the dropped session was closed
     assert len(conns) == 2                         # then replaced
     assert rows["a@x.com"].status == "sent"
+
+
+def post_job(env, csv_text, dry_run=False):
+    cfg = {"event_config": {"name": "E", "template_path": env.template,
+                            "text_position_x": 200, "text_position_y": 140,
+                            "font_size": 48, "max_text_width": 350},
+           "dry_run": dry_run}
+    return env.post("/api/jobs",
+                    data={"config": json.dumps(cfg)},
+                    files={"csv_file": ("p.csv", io.BytesIO(csv_text.encode()), "text/csv")})
+
+
+def test_repeated_email_is_sent_once(env):
+    res = post_job(env, "name,email\nAda,a@x.com\nAda L,A@X.com\nBo,b@x.com\n")
+    assert res.status_code == 201
+    assert res.json()["duplicates_skipped"] == 1
+    db = env.Session()
+    by_index = {r.row_index: r for r in db.query(JobRow).all()}
+    assert by_index[1].status == "skipped"
+    assert by_index[1].error_message == "Duplicate of row 1"
+    db.close()
+
+
+def _run_with_skipped_duplicate(env):
+    db = env.Session()
+    db.add(Job(id="j", status="pending", dry_run=False, total_rows=2))
+    db.add(JobRow(job_id="j", row_index=0, name="Ada", email="a@x.com", status="pending"))
+    db.add(JobRow(job_id="j", row_index=1, name="Ada", email="a@x.com",
+                  status="skipped", error_message="Duplicate of row 1"))
+    db.commit()
+    db.close()
+    config = {"template_path": env.template, "text_position_x": 200,
+              "text_position_y": 140, "font_size": 48, "max_text_width": 350}
+    rows = [{"name": "Ada", "email": "a@x.com"},
+            {"name": "Ada", "email": "a@x.com", "duplicate_of": 0}]
+    asyncio.run(job_runner.run_job("j", config, rows, False))
+
+
+def test_runner_never_sends_to_a_skipped_row(env):
+    _run_with_skipped_duplicate(env)
+    assert env.state["sent"] == ["a@x.com"]
+
+
+def test_skipped_duplicate_does_not_touch_counters(env):
+    _run_with_skipped_duplicate(env)
+    db = env.Session()
+    job = db.query(Job).first()
+    skipped = db.query(JobRow).filter(JobRow.row_index == 1).one()
+    assert skipped.status == "skipped"
+    assert (job.sent_count, job.failed_count, job.invalid_count) == (1, 0, 0)
+    assert job.total_rows == 2
+    db.close()
+
+
+def test_total_rows_counts_every_csv_row_including_skipped(env):
+    res = post_job(env, "name,email\nAda,a@x.com\nAda L,a@x.com\n")
+    db = env.Session()
+    job = db.query(Job).filter(Job.id == res.json()["job_id"]).one()
+    # TestClient runs the background task, so the first row really sent.
+    assert job.total_rows == 2
+    assert (job.sent_count, job.failed_count, job.invalid_count) == (1, 0, 0)
+    assert env.state["sent"] == ["a@x.com"]
+    db.close()
+
+
+def test_dry_run_keeps_duplicates(env):
+    res = post_job(env, "name,email\nAda,a@x.com\nAda L,a@x.com\n", dry_run=True)
+    assert res.json()["duplicates_skipped"] == 0
