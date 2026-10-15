@@ -1,5 +1,6 @@
 import asyncio
 import smtplib
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -68,9 +69,9 @@ def env(tmp_path, monkeypatch):
     app.dependency_overrides.clear()
 
 
-def run(env, people):
+def run(env, people, dry_run=False):
     db = env.Session()
-    db.add(Job(id="j", status="pending", dry_run=False, total_rows=len(people)))
+    db.add(Job(id="j", status="pending", dry_run=dry_run, total_rows=len(people)))
     for i, (n, e) in enumerate(people):
         db.add(JobRow(job_id="j", row_index=i, name=n, email=e, status="pending"))
     db.commit()
@@ -79,7 +80,7 @@ def run(env, people):
               "text_position_y": 140, "font_size": 48, "max_text_width": 350,
               "email_subject": "s", "email_body": "Hi {name}"}
     rows = [{"name": n, "email": e} for n, e in people]
-    asyncio.run(job_runner.run_job("j", config, rows, False))
+    asyncio.run(job_runner.run_job("j", config, rows, dry_run))
     db = env.Session()
     out = {r.email: r for r in db.query(JobRow).all()}
     job = db.query(Job).first()
@@ -122,8 +123,10 @@ def test_daily_limit_stops_the_run_and_marks_the_rest(env):
     job, rows = run(env, PEOPLE)
     assert rows["a@x.com"].status == "sent"
     assert rows["b@x.com"].status == "failed"
+    assert rows["b@x.com"].error_message == "Daily send limit reached. Re-send tomorrow."
     assert rows["c@x.com"].status == "failed"
-    assert "Daily send limit" in rows["c@x.com"].error_message
+    assert rows["c@x.com"].error_message == "Daily send limit reached. Re-send tomorrow."
+    assert job.failed_count == 2
     assert env.state["sent"] == ["a@x.com"]        # c was never attempted
     assert job.status == "done"
 
@@ -138,6 +141,50 @@ def test_configured_cap_stops_before_sending(env, monkeypatch):
 
 def test_throttle_waits_between_sends(env, monkeypatch):
     monkeypatch.setenv("SEND_INTERVAL_SECONDS", "5")
-    monkeypatch.setattr(job_runner.time, "monotonic", lambda: 1000.0)  # clock frozen
+    # Freeze only job_runner's clock; patching time.monotonic globally would also freeze asyncio's.
+    monkeypatch.setattr(job_runner, "time", SimpleNamespace(monotonic=lambda: 1000.0))
     run(env, PEOPLE[:2])
     assert 5.0 in env.sleeps
+
+
+def test_dry_run_ignores_throttle_and_cap_and_sends_nothing(env, monkeypatch):
+    monkeypatch.setenv("SEND_INTERVAL_SECONDS", "5")
+    monkeypatch.setenv("SEND_DAILY_CAP", "0")
+    job, rows = run(env, PEOPLE, dry_run=True)
+    assert env.sleeps == []                        # no throttle sleep
+    assert env.state["sent"] == []                 # send never called
+    assert env.state["connections"] == 0           # no SMTP connection opened
+    for r in rows.values():
+        assert r.status == "generated"
+        assert r.attempts == 0
+
+
+def test_permanent_rejection_does_not_consume_cap(env, monkeypatch):
+    monkeypatch.setenv("SEND_DAILY_CAP", "2")
+    env.state["script"] = [smtplib.SMTPDataError(550, b"rejected")]
+    job, rows = run(env, PEOPLE)
+    assert rows["a@x.com"].status == "failed"
+    assert rows["a@x.com"].error_message != "Daily send limit reached. Re-send tomorrow."
+    assert rows["b@x.com"].status == "sent"
+    assert rows["c@x.com"].status == "sent"
+    assert env.state["sent"] == ["b@x.com", "c@x.com"]
+
+
+def test_dropped_connection_is_closed_before_reconnect(env, monkeypatch):
+    closed, conns = [], []
+
+    class Conn:
+        def close(self):
+            closed.append(self)
+
+    def make_conn():
+        c = Conn()
+        conns.append(c)
+        return c
+
+    monkeypatch.setattr(mailer, "make_smtp_connection", make_conn)
+    env.state["script"] = [smtplib.SMTPServerDisconnected("dropped")]
+    job, rows = run(env, PEOPLE[:1])
+    assert closed == [conns[0]]                    # the dropped session was closed
+    assert len(conns) == 2                         # then replaced
+    assert rows["a@x.com"].status == "sent"

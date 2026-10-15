@@ -78,6 +78,10 @@ async def _send_with_retry(loop, smtp_holder, db_row, settings, throttle, **send
             await asyncio.sleep(send_policy.backoff_delay(attempt, settings.backoff_base))
             attempt += 1
             try:
+                smtp_holder[0].close()
+            except Exception:
+                pass  # best-effort: the session is already dead, and a stub may not have close()
+            try:
                 smtp_holder[0] = await loop.run_in_executor(None, mailer.make_smtp_connection)
             except Exception:
                 pass  # the next attempt fails and is counted like any other
