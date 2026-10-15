@@ -73,5 +73,7 @@ class JobRow(Base):
     # pending | sent | failed | skipped | invalid_domain | bounced
     status = Column(String, default="pending", nullable=False)
     error_message = Column(Text, nullable=True)
+    sent_at = Column(DateTime, nullable=True)       # UTC, when the message left
+    attempts = Column(Integer, default=0, nullable=False)
 
     job = relationship("Job", back_populates="rows")
