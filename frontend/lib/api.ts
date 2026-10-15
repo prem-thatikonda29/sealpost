@@ -31,6 +31,7 @@ export interface JobRow {
   email: string;
   status: string;
   error_message?: string;
+  sent_at?: string;
 }
 
 export interface Job {

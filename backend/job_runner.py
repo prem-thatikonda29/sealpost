@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import Job, JobRow
 from .paths import OUTPUT_DIR
+from .timeutil import utc_naive_now
 from . import cert_engine, email_validator, mailer
 
 # job_id → asyncio.Queue of SSE event dicts
@@ -141,7 +142,7 @@ async def run_job(
                 )
             except Exception as exc:
                 job.status = "failed"
-                job.finished_at = datetime.now(timezone.utc)
+                job.finished_at = utc_naive_now()
                 db.commit()
                 _push(job_id, {"type": "error", "message": str(exc)})
                 _push(job_id, {"type": "done", "sent": 0, "failed": 0,
@@ -286,7 +287,7 @@ async def run_job(
                     })
 
         job.status = "done"
-        job.finished_at = datetime.now(timezone.utc)
+        job.finished_at = utc_naive_now()
         db.commit()
 
         _push(job_id, {
@@ -303,7 +304,7 @@ async def run_job(
             job = _db_job(db, job_id)
             if job:
                 job.status = "failed"
-                job.finished_at = datetime.now(timezone.utc)
+                job.finished_at = utc_naive_now()
                 db.commit()
         except Exception:
             pass

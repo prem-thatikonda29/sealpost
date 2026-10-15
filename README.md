@@ -11,6 +11,7 @@ Browser-based certificate generation and email sending tool. Upload templates, p
 - **Re-send failures**: retry only the rows that missed out, with a message you can rewrite
 - **Generate all and download**: a dry run that generates every certificate, packaged up as a zip
 - **Job history**: per-row status and CSV export, plus delete a job or clear the history
+- **IST by default**: all times are shown in Indian Standard Time; set `APP_TIMEZONE` to change it
 - **Bundled font library**: pick from the bundled fonts or upload your own
 
 ## Prerequisites
