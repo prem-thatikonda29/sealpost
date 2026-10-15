@@ -2,6 +2,7 @@ import smtplib
 import socket
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -114,3 +115,38 @@ def test_row_exactly_at_24h_boundary_is_counted(tmp_path):
     db, base = _seed_sent(tmp_path, hours_ago=(24,))
     assert send_policy.sent_in_last_day(db, base) == 1
     assert send_policy.sent_in_last_day(db, base.astimezone(timezone(timedelta(hours=5)))) == 1
+
+
+def test_recipients_refused_daily_limit_is_detected():
+    exc = smtplib.SMTPRecipientsRefused({"a@x.com": (550, b"5.4.5 Daily user sending limit exceeded")})
+    assert send_policy.is_daily_limit(exc)
+    assert not send_policy.is_transient(exc)
+
+
+def test_plain_recipient_refusal_is_neither():
+    exc = smtplib.SMTPRecipientsRefused({"a@x.com": (550, b"no such user")})
+    assert not send_policy.is_daily_limit(exc)
+    assert not send_policy.is_transient(exc)
+
+
+def test_sender_refused_daily_limit_is_detected():
+    exc = smtplib.SMTPSenderRefused(550, b"5.4.5 Daily user sending limit exceeded", "me@x.com")
+    assert send_policy.is_daily_limit(exc)
+    assert not send_policy.is_transient(exc)
+
+
+@pytest.mark.parametrize("value", ["inf", "nan", "-1", "-inf"])
+def test_non_finite_or_negative_settings_fall_back(monkeypatch, value):
+    monkeypatch.setenv("SEND_INTERVAL_SECONDS", value)
+    monkeypatch.setenv("SEND_DAILY_CAP", value)
+    monkeypatch.setenv("SEND_MAX_RETRIES", value)
+    monkeypatch.setenv("SEND_BACKOFF_BASE_SECONDS", value)
+    s = send_policy.load_settings()
+    assert (s.interval, s.daily_cap, s.max_retries, s.backoff_base) == (1.0, 450, 3, 2.0)
+
+
+def test_zero_is_a_valid_setting(monkeypatch):
+    monkeypatch.setenv("SEND_DAILY_CAP", "0")
+    monkeypatch.setenv("SEND_INTERVAL_SECONDS", "0")
+    s = send_policy.load_settings()
+    assert (s.daily_cap, s.interval) == (0, 0.0)

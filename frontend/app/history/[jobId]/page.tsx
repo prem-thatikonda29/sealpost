@@ -74,9 +74,9 @@ export default function JobDetailPage() {
 
   const rows = job.rows ?? [];
 
-  /* Everything that didn't get a certificate. A dry run's rows are "skipped",
-     which means nothing was attempted — not that it failed — so they are not
-     here. */
+  /* Everything that didn't get a certificate. A dry run's rows are "generated"
+     and a "skipped" row is a repeated address that was deliberately not
+     processed — neither failed, so neither is listed here. */
   const undelivered = rows.filter((r) =>
     ["failed", "invalid_domain", "bounced"].includes(r.status)
   );

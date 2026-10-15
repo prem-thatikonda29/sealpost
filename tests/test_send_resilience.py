@@ -192,6 +192,41 @@ def test_dropped_connection_is_closed_before_reconnect(env, monkeypatch):
     assert rows["a@x.com"].status == "sent"
 
 
+def test_recipients_refused_daily_limit_stops_the_run(env):
+    env.state["script"] = [None, smtplib.SMTPRecipientsRefused(
+        {"b@x.com": (550, b"5.4.5 Daily user sending limit exceeded")})]
+    job, rows = run(env, PEOPLE)
+    assert rows["a@x.com"].status == "sent"
+    assert rows["b@x.com"].status == "failed"
+    assert rows["c@x.com"].status == "failed"
+    assert rows["c@x.com"].error_message == "Daily send limit reached. Re-send tomorrow."
+    assert env.state["sent"] == ["a@x.com"]
+
+
+def test_skipped_duplicate_is_announced_on_the_event_queue(env):
+    _run_with_skipped_duplicate(env)
+    q = job_runner.get_queue("j")
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    skipped = [e for e in events if e["type"] == "row" and e["status"] == "skipped"]
+    assert skipped == [{"type": "row", "index": 1, "name": "Ada", "email": "a@x.com",
+                        "status": "skipped", "error": "Duplicate of row 1"}]
+
+
+def test_bounce_is_attributed_to_the_sent_row_not_the_skipped_duplicate(env, monkeypatch):
+    monkeypatch.setattr(mailer, "poll_bounces", lambda since: ["a@x.com"])
+    # The skipped row is stored first, so an unfiltered .first() would pick it.
+    _run_with_skipped_duplicate(env, skipped_inserted_first=True)
+    db = env.Session()
+    job = db.query(Job).first()
+    by_index = {r.row_index: r for r in db.query(JobRow).all()}
+    assert by_index[0].status == "bounced"
+    assert by_index[1].status == "skipped"
+    assert job.bounced_count == 1
+    db.close()
+
+
 def post_job(env, csv_text, dry_run=False):
     cfg = {"event_config": {"name": "E", "template_path": env.template,
                             "text_position_x": 200, "text_position_y": 140,
@@ -213,12 +248,15 @@ def test_repeated_email_is_sent_once(env):
     db.close()
 
 
-def _run_with_skipped_duplicate(env):
+def _run_with_skipped_duplicate(env, skipped_inserted_first=False):
     db = env.Session()
     db.add(Job(id="j", status="pending", dry_run=False, total_rows=2))
-    db.add(JobRow(job_id="j", row_index=0, name="Ada", email="a@x.com", status="pending"))
-    db.add(JobRow(job_id="j", row_index=1, name="Ada", email="a@x.com",
-                  status="skipped", error_message="Duplicate of row 1"))
+    first = JobRow(job_id="j", row_index=0, name="Ada", email="a@x.com", status="pending")
+    dup = JobRow(job_id="j", row_index=1, name="Ada", email="a@x.com",
+                 status="skipped", error_message="Duplicate of row 1")
+    for r in ((dup, first) if skipped_inserted_first else (first, dup)):
+        db.add(r)
+        db.flush()
     db.commit()
     db.close()
     config = {"template_path": env.template, "text_position_x": 200,
@@ -250,6 +288,7 @@ def test_total_rows_counts_every_csv_row_including_skipped(env):
     job = db.query(Job).filter(Job.id == res.json()["job_id"]).one()
     # TestClient runs the background task, so the first row really sent.
     assert job.total_rows == 2
+    assert job.status == "done"
     assert (job.sent_count, job.failed_count, job.invalid_count) == (1, 0, 0)
     assert env.state["sent"] == ["a@x.com"]
     db.close()
@@ -258,3 +297,10 @@ def test_total_rows_counts_every_csv_row_including_skipped(env):
 def test_dry_run_keeps_duplicates(env):
     res = post_job(env, "name,email\nAda,a@x.com\nAda L,a@x.com\n", dry_run=True)
     assert res.json()["duplicates_skipped"] == 0
+    db = env.Session()
+    job = db.query(Job).filter(Job.id == res.json()["job_id"]).one()
+    statuses = [r.status for r in db.query(JobRow).order_by(JobRow.row_index)]
+    assert job.total_rows == 2
+    assert "skipped" not in statuses
+    assert statuses == ["generated", "generated"]
+    db.close()

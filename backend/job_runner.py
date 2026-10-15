@@ -139,7 +139,17 @@ async def run_job(
             valid_indices = []
             for row_idx, row in enumerate(rows_to_process):
                 if row.get("duplicate_of") is not None:
-                    continue  # already marked skipped when the job was created
+                    # Already marked skipped when the job was created; tell the
+                    # live view, which would otherwise never see this row.
+                    _push(job_id, {
+                        "type": "row",
+                        "index": row_idx,
+                        "name": row.get("name", ""),
+                        "email": row.get("email", "").strip(),
+                        "status": "skipped",
+                        "error": f"Duplicate of row {row['duplicate_of'] + 1}",
+                    })
+                    continue
                 db_row = db.query(JobRow).filter(
                     JobRow.job_id == job_id, JobRow.row_index == row_idx
                 ).first()
@@ -328,6 +338,7 @@ async def run_job(
                 db_row = db.query(JobRow).filter(
                     JobRow.job_id == job_id,
                     JobRow.email == addr,
+                    JobRow.status == "sent",
                 ).first()
                 if db_row and db_row.status == "sent":
                     db_row.status = "bounced"

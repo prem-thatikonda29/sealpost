@@ -6,6 +6,7 @@ Gmail allows roughly 500 messages a day on a personal account, and the limit is
 a rolling 24 hours. SEND_DAILY_CAP defaults below that so a run stops on our
 terms instead of in the middle of a 550.
 """
+import math
 import os
 import smtplib
 import socket
@@ -26,10 +27,18 @@ class SendSettings:
 
 
 def _env(name: str, default, cast):
+    """Read a setting; anything unparsable, non-finite or negative uses the default.
+
+    inf would hang asyncio.sleep, nan breaks comparisons. 0 is valid (a cap of 0
+    pauses all sends).
+    """
     try:
-        return cast(os.environ[name])
+        value = cast(os.environ[name])
     except (KeyError, ValueError):
         return default
+    if not math.isfinite(value) or value < 0:
+        return default
+    return value
 
 
 def load_settings() -> SendSettings:
@@ -50,9 +59,18 @@ def _smtp_text(exc: Exception) -> str:
 
 def is_daily_limit(exc: Exception) -> bool:
     """Gmail's 'Daily user sending limit exceeded' (550 5.4.5). Retrying is pointless."""
-    if not isinstance(exc, smtplib.SMTPResponseException):
+    if isinstance(exc, smtplib.SMTPRecipientsRefused):
+        # With a single recipient sendmail raises this instead of a response error.
+        texts = []
+        for _code, msg in exc.recipients.values():
+            if isinstance(msg, bytes):
+                msg = msg.decode("utf-8", errors="ignore")
+            texts.append(str(msg).lower())
+        text = " ".join(texts)
+    elif isinstance(exc, smtplib.SMTPResponseException):
+        text = _smtp_text(exc)
+    else:
         return False
-    text = _smtp_text(exc)
     return "5.4.5" in text or "daily user sending" in text
 
 
