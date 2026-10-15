@@ -79,3 +79,38 @@ def test_sent_in_last_day_counts_sent_and_bounced_only(tmp_path):
                       status=status, sent_at=at.replace(tzinfo=None)))
     db.commit()
     assert send_policy.sent_in_last_day(db, now) == 2
+
+
+def _seed_sent(tmp_path, hours_ago):
+    """Sent rows stored the way the app stores them: naive UTC. Returns (db, base_utc)."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'p.db'}")
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    base = datetime(2026, 10, 16, 12, 0, tzinfo=timezone.utc)
+    db.add(Job(id="j", status="done", total_rows=len(hours_ago),
+               created_at=base.replace(tzinfo=None)))
+    for i, hours in enumerate(hours_ago):
+        db.add(JobRow(job_id="j", row_index=i, name="n", email=f"{i}@x.com",
+                      status="sent", sent_at=(base - timedelta(hours=hours)).replace(tzinfo=None)))
+    db.commit()
+    return db, base
+
+
+def test_aware_non_utc_now_counts_same_as_utc(tmp_path):
+    # 1h and 23h ago are inside the window; the 23h row falls between the naive
+    # cutoffs that a bare replace(tzinfo=None) would produce for a +05:00 clock.
+    db, base = _seed_sent(tmp_path, hours_ago=(1, 23, 25))
+    plus5 = timezone(timedelta(hours=5))
+    assert send_policy.sent_in_last_day(db, base) == 2
+    assert send_policy.sent_in_last_day(db, base.astimezone(plus5)) == 2
+
+
+def test_naive_now_is_treated_as_utc(tmp_path):
+    db, base = _seed_sent(tmp_path, hours_ago=(1, 23, 25))
+    assert send_policy.sent_in_last_day(db, base.replace(tzinfo=None)) == 2
+
+
+def test_row_exactly_at_24h_boundary_is_counted(tmp_path):
+    db, base = _seed_sent(tmp_path, hours_ago=(24,))
+    assert send_policy.sent_in_last_day(db, base) == 1
+    assert send_policy.sent_in_last_day(db, base.astimezone(timezone(timedelta(hours=5)))) == 1

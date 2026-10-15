@@ -74,6 +74,6 @@ class JobRow(Base):
     status = Column(String, default="pending", nullable=False)
     error_message = Column(Text, nullable=True)
     sent_at = Column(DateTime, nullable=True)       # UTC, when the message left
-    attempts = Column(Integer, default=0, nullable=False)
+    attempts = Column(Integer, default=0, server_default="0", nullable=False)
 
     job = relationship("Job", back_populates="rows")

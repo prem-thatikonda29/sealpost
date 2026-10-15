@@ -10,7 +10,7 @@ import os
 import smtplib
 import socket
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -88,8 +88,14 @@ class Throttle:
 
 
 def sent_in_last_day(db: Session, now: datetime) -> int:
-    """Messages that actually left in the last 24h, across every job."""
-    cutoff = (now - timedelta(hours=24)).replace(tzinfo=None)
+    """Messages that actually left in the last 24h, across every job.
+
+    sent_at is stored as naive UTC. Legacy 'sent' rows with NULL sent_at are not
+    counted, so the cap may under-count for the first day after upgrade.
+    """
+    if now.tzinfo is not None:
+        now = now.astimezone(timezone.utc).replace(tzinfo=None)  # naive is treated as UTC
+    cutoff = now - timedelta(hours=24)
     return (
         db.query(JobRow)
         .filter(JobRow.status.in_(("sent", "bounced")), JobRow.sent_at >= cutoff)
