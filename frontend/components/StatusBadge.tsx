@@ -23,12 +23,13 @@ const STATUS: Record<string, Meta> = {
   failed: { variant: "danger", label: "Failed" },
   // row-level
   sent: { variant: "ok", label: "Sent" },
-  // Rendered but deliberately not emailed — a "generate all and download" run.
-  // Not "skipped", which would suggest nothing happened.
+  // Generate-only runs use "generated": rendered but deliberately not emailed.
   generated: { variant: "ok", label: "Generated" },
   invalid_domain: { variant: "warn", label: "Invalid domain" },
   bounced: { variant: "info", label: "Bounced" },
-  skipped: { variant: "neutral", label: "Dry run" },
+  // "skipped" means a row deliberately not processed, e.g. a repeated address
+  // within one upload. The row's error message says why.
+  skipped: { variant: "neutral", label: "Skipped" },
   // row-level, in flight. These are streamed but never written to the row, so
   // they appear live and never in history — which is why they are listed here
   // anyway: the badge is still the one place a status becomes a colour.

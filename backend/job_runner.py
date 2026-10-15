@@ -9,6 +9,7 @@ Three-phase pipeline per job:
 import asyncio
 import json
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -17,7 +18,8 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import Job, JobRow
 from .paths import OUTPUT_DIR
-from . import cert_engine, email_validator, mailer
+from .timeutil import utc_naive_now
+from . import cert_engine, email_validator, mailer, send_policy
 
 # job_id → asyncio.Queue of SSE event dicts
 _queues: Dict[str, asyncio.Queue] = {}
@@ -49,6 +51,40 @@ def _push(job_id: str, event: dict) -> None:
             q.put_nowait(event)
         except asyncio.QueueFull:
             pass
+
+
+async def _send_with_retry(loop, smtp_holder, db_row, settings, throttle, **send_kwargs):
+    """Send one message. Returns normally on success; raises the final error otherwise.
+
+    Transient errors back off and retry on a fresh connection, because a dropped
+    session stays dropped. A daily-limit error is raised straight away.
+    """
+    attempt = 0
+    while True:
+        wait = throttle.delay(time.monotonic())
+        if wait > 0:
+            await asyncio.sleep(wait)
+        db_row.attempts = (db_row.attempts or 0) + 1
+        try:
+            await loop.run_in_executor(
+                None, lambda: mailer.send_certificate(smtp=smtp_holder[0], **send_kwargs)
+            )
+            throttle.mark(time.monotonic())
+            return
+        except Exception as exc:
+            throttle.mark(time.monotonic())
+            if not send_policy.is_transient(exc) or attempt >= settings.max_retries:
+                raise
+            await asyncio.sleep(send_policy.backoff_delay(attempt, settings.backoff_base))
+            attempt += 1
+            try:
+                smtp_holder[0].close()
+            except Exception:
+                pass  # best-effort: the session is already dead, and a stub may not have close()
+            try:
+                smtp_holder[0] = await loop.run_in_executor(None, mailer.make_smtp_connection)
+            except Exception:
+                pass  # the next attempt fails and is counted like any other
 
 
 async def run_job(
@@ -102,6 +138,18 @@ async def run_job(
 
             valid_indices = []
             for row_idx, row in enumerate(rows_to_process):
+                if row.get("duplicate_of") is not None:
+                    # Already marked skipped when the job was created; tell the
+                    # live view, which would otherwise never see this row.
+                    _push(job_id, {
+                        "type": "row",
+                        "index": row_idx,
+                        "name": row.get("name", ""),
+                        "email": row.get("email", "").strip(),
+                        "status": "skipped",
+                        "error": f"Duplicate of row {row['duplicate_of'] + 1}",
+                    })
+                    continue
                 db_row = db.query(JobRow).filter(
                     JobRow.job_id == job_id, JobRow.row_index == row_idx
                 ).first()
@@ -134,6 +182,7 @@ async def run_job(
         # Phase 2 — Generate + Send
         # ------------------------------------------------------------------
         smtp_conn = None
+        smtp_holder = [None]
         if not dry_run:
             try:
                 smtp_conn = await loop.run_in_executor(
@@ -141,12 +190,13 @@ async def run_job(
                 )
             except Exception as exc:
                 job.status = "failed"
-                job.finished_at = datetime.now(timezone.utc)
+                job.finished_at = utc_naive_now()
                 db.commit()
                 _push(job_id, {"type": "error", "message": str(exc)})
                 _push(job_id, {"type": "done", "sent": 0, "failed": 0,
                                "invalid": job.invalid_count, "bounced": 0})
                 return
+            smtp_holder[0] = smtp_conn
 
         # Resolved against the repo root, not the process's working directory.
         # As a bare "output/" this wrote wherever uvicorn happened to have been
@@ -162,6 +212,16 @@ async def run_job(
             event_config.get("text_position_x", 0),
             event_config.get("text_position_y", 0),
         )
+
+        settings = send_policy.load_settings()
+        throttle = send_policy.Throttle(settings.interval)
+        cap_left = None
+        if not dry_run:
+            cap_left = settings.daily_cap - send_policy.sent_in_last_day(
+                db, datetime.now(timezone.utc)
+            )
+        cap_hit = False
+        LIMIT_MSG = "Daily send limit reached. Re-send tomorrow."
 
         for row_idx in valid_indices:
             row = rows_to_process[row_idx]
@@ -188,6 +248,15 @@ async def run_job(
                 "email": email,
             }
 
+            if not dry_run and (cap_hit or cap_left <= 0):
+                db_row.status = "failed"
+                db_row.error_message = LIMIT_MSG
+                job.failed_count = (job.failed_count or 0) + 1
+                db.commit()
+                _push(job_id, {"type": "row", "index": row_idx, "name": name,
+                               "email": email, "status": "failed", "error": LIMIT_MSG})
+                continue
+
             try:
                 # A dry run renders and stops. Originally it did neither, which
                 # made the label ("generate the certificates but send nothing")
@@ -211,17 +280,14 @@ async def run_job(
 
                 if not dry_run:
                     _push(job_id, {**row_event, "status": "sending"})
-                    await loop.run_in_executor(
-                        None,
-                        lambda e=email, p=pdf_path, n=name: mailer.send_certificate(
-                            smtp=smtp_conn,
-                            name=n,
-                            email=e,
-                            pdf_path=p,
-                            subject=event_config.get("email_subject", "Your Certificate"),
-                            body=event_config.get("email_body", "Hi {name}, please find your certificate attached."),
-                        ),
+                    await _send_with_retry(
+                        loop, smtp_holder, db_row, settings, throttle,
+                        name=name, email=email, pdf_path=pdf_path,
+                        subject=event_config.get("email_subject", "Your Certificate"),
+                        body=event_config.get("email_body", "Hi {name}, please find your certificate attached."),
                     )
+                    cap_left -= 1
+                    db_row.sent_at = utc_naive_now()
 
                 if dry_run:
                     # Nothing was sent, so nothing counts as sent. total_rows is
@@ -234,6 +300,9 @@ async def run_job(
                 _push(job_id, {**row_event, "status": db_row.status})
 
             except Exception as exc:
+                if send_policy.is_daily_limit(exc):
+                    cap_hit = True
+                    exc = RuntimeError(LIMIT_MSG)
                 db_row.status = "failed"
                 db_row.error_message = str(exc)
                 db.commit()
@@ -248,9 +317,9 @@ async def run_job(
                     "error": str(exc),
                 })
 
-        if smtp_conn:
+        if smtp_holder[0]:
             try:
-                smtp_conn.quit()
+                smtp_holder[0].quit()
             except Exception:
                 pass
 
@@ -269,6 +338,7 @@ async def run_job(
                 db_row = db.query(JobRow).filter(
                     JobRow.job_id == job_id,
                     JobRow.email == addr,
+                    JobRow.status == "sent",
                 ).first()
                 if db_row and db_row.status == "sent":
                     db_row.status = "bounced"
@@ -286,7 +356,7 @@ async def run_job(
                     })
 
         job.status = "done"
-        job.finished_at = datetime.now(timezone.utc)
+        job.finished_at = utc_naive_now()
         db.commit()
 
         _push(job_id, {
@@ -303,7 +373,7 @@ async def run_job(
             job = _db_job(db, job_id)
             if job:
                 job.status = "failed"
-                job.finished_at = datetime.now(timezone.utc)
+                job.finished_at = utc_naive_now()
                 db.commit()
         except Exception:
             pass

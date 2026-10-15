@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine, Base
+from .migrations import ensure_columns
 from .paths import FONTS_UPLOAD_DIR, OUTPUT_DIR, UPLOADS_DIR
 from .routers import events, templates, preview, jobs, fonts
 
@@ -18,6 +19,7 @@ _ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:300
 async def lifespan(app: FastAPI):
     # Create all tables on startup; also ensure runtime directories exist
     Base.metadata.create_all(bind=engine)
+    ensure_columns(engine)
     for directory in (UPLOADS_DIR, FONTS_UPLOAD_DIR, OUTPUT_DIR):
         os.makedirs(directory, exist_ok=True)
     yield

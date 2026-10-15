@@ -9,6 +9,7 @@ import { EmailText, EmailToggle } from "@/components/EmailToggle";
 import { ResendPanel } from "@/components/ResendPanel";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useNotify } from "@/lib/notify";
+import { formatDateTime } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
@@ -73,9 +74,9 @@ export default function JobDetailPage() {
 
   const rows = job.rows ?? [];
 
-  /* Everything that didn't get a certificate. A dry run's rows are "skipped",
-     which means nothing was attempted — not that it failed — so they are not
-     here. */
+  /* Everything that didn't get a certificate. A dry run's rows are "generated"
+     and a "skipped" row is a repeated address that was deliberately not
+     processed — neither failed, so neither is listed here. */
   const undelivered = rows.filter((r) =>
     ["failed", "invalid_domain", "bounced"].includes(r.status)
   );
@@ -117,7 +118,7 @@ export default function JobDetailPage() {
 
       <PageHeader
         title={job.event_name ?? "One-off job"}
-        subtitle={`${new Date(job.created_at).toLocaleString()}${job.dry_run ? " · dry run" : ""}`}
+        subtitle={`${formatDateTime(job.created_at)}${job.dry_run ? " · dry run" : ""}`}
         actions={
           <div className="flex gap-2">
             {job.certificates_available && (

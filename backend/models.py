@@ -1,10 +1,10 @@
 import uuid
-from datetime import datetime
 from sqlalchemy import (
     Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Float
 )
 from sqlalchemy.orm import relationship
 from .database import Base
+from .timeutil import utc_naive_now
 
 
 def _uuid():
@@ -34,7 +34,7 @@ class Event(Base):
     font_color = Column(String, default="#000000", nullable=False)  # CSS hex
     max_text_width = Column(Integer, default=1400, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
 
     jobs = relationship("Job", back_populates="event")
 
@@ -55,7 +55,7 @@ class Job(Base):
     bounced_count = Column(Integer, default=0, nullable=False)
     dry_run = Column(Boolean, default=False, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
     finished_at = Column(DateTime, nullable=True)
 
     event = relationship("Event", back_populates="jobs")
@@ -73,5 +73,7 @@ class JobRow(Base):
     # pending | sent | failed | skipped | invalid_domain | bounced
     status = Column(String, default="pending", nullable=False)
     error_message = Column(Text, nullable=True)
+    sent_at = Column(DateTime, nullable=True)       # UTC, when the message left
+    attempts = Column(Integer, default=0, server_default="0", nullable=False)
 
     job = relationship("Job", back_populates="rows")

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Event
+from ..timeutil import utc_naive_now
 from ..schemas import EventCreate, EventResponse, EventUpdate
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -27,7 +28,7 @@ def create_event(body: EventCreate, db: Session = Depends(get_db)):
         # We give it a fake id so the schema validates.
         return EventResponse(
             id="one-off",
-            created_at=__import__("datetime").datetime.utcnow(),
+            created_at=utc_naive_now(),
             **body.model_dump(exclude={"save"}),
         )
 

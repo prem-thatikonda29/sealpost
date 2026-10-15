@@ -1,6 +1,6 @@
 import json
-from datetime import datetime
 from typing import Optional, List
+from .timeutil import AppDatetime
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -33,7 +33,7 @@ class EventUpdate(EventBase):
 
 class EventResponse(EventBase):
     id: str
-    created_at: datetime
+    created_at: AppDatetime
 
     class Config:
         from_attributes = True
@@ -51,6 +51,7 @@ class JobRowResponse(BaseModel):
     email: str
     status: str
     error_message: Optional[str] = None
+    sent_at: Optional[AppDatetime] = None
 
     class Config:
         from_attributes = True
@@ -82,8 +83,8 @@ class JobResponse(BaseModel):
     invalid_count: int
     bounced_count: int
     dry_run: bool
-    created_at: datetime
-    finished_at: Optional[datetime]
+    created_at: AppDatetime
+    finished_at: Optional[AppDatetime]
     rows: List[JobRowResponse] = []
     # Whether there is a zip to offer. Computed from disk, not stored.
     certificates_available: bool = False
@@ -118,8 +119,8 @@ class JobListItem(BaseModel):
     invalid_count: int
     bounced_count: int
     dry_run: bool
-    created_at: datetime
-    finished_at: Optional[datetime]
+    created_at: AppDatetime
+    finished_at: Optional[AppDatetime]
 
     class Config:
         from_attributes = True
@@ -162,7 +163,7 @@ class DuplicateCheckRequest(BaseModel):
 class DuplicateRecipient(BaseModel):
     email: str
     name: str
-    sent_at: Optional[datetime] = None
+    sent_at: Optional[AppDatetime] = None
 
 
 class DuplicateCheckResult(BaseModel):

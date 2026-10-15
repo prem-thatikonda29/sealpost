@@ -233,6 +233,22 @@ async def create_job(
             ),
         )
 
+    # One address, one certificate per send. A name appearing twice with the
+    # same address is nearly always a paste error, and sending twice looks
+    # careless. Generate-only runs keep every row: nothing is emailed there.
+    first_seen: dict[str, int] = {}
+    duplicates_skipped = 0
+    if not cfg.dry_run:
+        for idx, row in enumerate(csv_rows):
+            key = row["email"].lower()
+            if not key:
+                continue
+            if key in first_seen:
+                row["duplicate_of"] = first_seen[key]
+                duplicates_skipped += 1
+            else:
+                first_seen[key] = idx
+
     # Create Job record
     job = Job(
         event_id=cfg.event_id,
@@ -250,12 +266,14 @@ async def create_job(
 
     # Create JobRow records
     for idx, row in enumerate(csv_rows):
+        dup = row.get("duplicate_of")
         db.add(JobRow(
             job_id=job.id,
             row_index=idx,
             name=row["name"],
             email=row["email"],
-            status="pending",
+            status="skipped" if dup is not None else "pending",
+            error_message=f"Duplicate of row {dup + 1}" if dup is not None else None,
         ))
 
     db.commit()
@@ -271,7 +289,7 @@ async def create_job(
         cfg.batch_size,
     )
 
-    return {"job_id": job.id}
+    return {"job_id": job.id, "duplicates_skipped": duplicates_skipped}
 
 
 # ---------------------------------------------------------------------------
