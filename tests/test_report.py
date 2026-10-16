@@ -3,6 +3,8 @@ import io
 from datetime import datetime
 from types import SimpleNamespace as NS
 
+import pytest
+
 from backend.report import COLUMNS, build_csv, summarize
 
 
@@ -73,8 +75,39 @@ def test_csv_is_ordered_by_row_and_quotes_commas():
     assert table[2][1] == 'Lovelace, "Ada"'
 
 
-def test_csv_neutralises_spreadsheet_formulas():
-    table = parse(build_csv([row(0, "sent", name="=HYPERLINK(\"http://x\")",
-                                 error_message="+1")]))
-    assert table[1][1].startswith("'=")
-    assert table[1][7] == "'+1"
+@pytest.mark.parametrize("value", [
+    "=HYPERLINK(\"http://x\")", "+1", "-1", "@SUM(A1)", "\t=1", "\r=1",
+    " =1", "\n=1", "  @SUM(A1)", "\n=cmd", " \t+1",
+])
+def test_csv_neutralises_spreadsheet_formulas(value):
+    table = parse(build_csv([row(0, "sent", name=value, error_message=value)]))
+    assert table[1][1] == "'" + value
+    assert table[1][7] == "'" + value
+
+
+def test_csv_leaves_ordinary_values_alone():
+    table = parse(build_csv([row(0, "sent", name="Ada", email="a-b")]))
+    assert table[1][1] == "Ada"
+    assert table[1][2] == "a-b"
+
+
+def test_pending_rows_stay_in_the_percentage_denominator():
+    rows = [row(0, "sent"), row(1, "pending")]
+    assert summarize(job(), rows)["delivered_pct"] == 50.0
+
+
+def test_sent_at_uses_the_configured_zone(monkeypatch):
+    monkeypatch.setenv("APP_TIMEZONE", "UTC")
+    rows = [row(0, "sent", sent_at=datetime(2026, 10, 16, 12, 0, 5))]
+    assert parse(build_csv(rows))[1][5] == "2026-10-16 12:00:05 UTC"
+
+
+def test_unknown_status_is_shown_unchanged():
+    table = parse(build_csv([row(0, "weird")]))
+    assert table[1][3] == "weird"
+    assert table[1][4] == "weird"
+
+
+def test_missing_attempts_are_written_as_zero():
+    table = parse(build_csv([row(0, "sent", attempts=None)]))
+    assert table[1][6] == "0"

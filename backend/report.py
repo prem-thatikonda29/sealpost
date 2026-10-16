@@ -23,14 +23,18 @@ OUTCOME = {
 
 COLUMNS = ["Row", "Name", "Email", "Outcome", "Status", "Sent at", "Attempts", "Note"]
 
-# A cell starting with one of these is read as a formula by Excel and Sheets.
-# Names and addresses come from an uploaded file, so they are not trusted.
-_FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+# A cell whose text (ignoring leading spaces and newlines) starts with one of these is
+# read as a formula by Excel and Sheets; a cell starting with a raw tab or CR is
+# guarded too. Names and addresses come from an uploaded file, so they are not trusted.
+_FORMULA_STARTS = ("=", "+", "-", "@")
+_CONTROL_STARTS = ("\t", "\r")
 
 
 def _safe(value) -> str:
     text = "" if value is None else str(value)
-    return "'" + text if text.startswith(_FORMULA_STARTS) else text
+    if text.startswith(_CONTROL_STARTS) or text.lstrip().startswith(_FORMULA_STARTS):
+        return "'" + text
+    return text
 
 
 def summarize(job, rows: Iterable) -> dict:
