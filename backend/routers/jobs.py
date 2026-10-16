@@ -186,6 +186,7 @@ async def create_job(
     # a re-send's rewritten message would have vanished.
     event_config["email_subject"] = cfg.email_subject
     event_config["email_body"] = cfg.email_body
+    event_config["sealpost_footer"] = cfg.sealpost_footer
 
     # A missing template or font would mark every row failed while the job ran
     # to completion. Reject the request instead.

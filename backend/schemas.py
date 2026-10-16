@@ -71,6 +71,8 @@ class JobCreate(BaseModel):
     # Email content is always supplied at run time
     email_subject: str = "Your Certificate"
     email_body: str = "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards"
+    # Off unless the organizer opts in: adds a "Sent with Sealpost" line.
+    sealpost_footer: bool = False
 
 
 class JobSummary(BaseModel):

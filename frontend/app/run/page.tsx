@@ -62,6 +62,7 @@ function RunPageInner() {
   const [tiers, setTiers] = useState<TierSetup[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [dryRun, setDryRun] = useState(false);
+  const [sealpostFooter, setSealpostFooter] = useState(false);
   const [batchSize, setBatchSize] = useState(0);
   const [runningJobs, setRunningJobs] = useState<TierJob[] | null>(null);
   const [starting, setStarting] = useState(false);
@@ -197,6 +198,7 @@ function RunPageInner() {
         event_id: tier.event.id,
         email_subject: tier.emailSubject,
         email_body: tier.emailBody,
+        sealpost_footer: sealpostFooter,
         dry_run: dryRun,
         batch_size: batchSize,
         // The columns the user actually picked. Hardcoding "name"/"email" meant
@@ -436,6 +438,27 @@ function RunPageInner() {
                     For when you don&apos;t want to send yet. Every certificate
                     is generated and nothing is emailed — when it finishes you
                     can download the lot as a zip.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <Checkbox
+                  id="sealpostFooter"
+                  checked={sealpostFooter}
+                  onCheckedChange={(v) => setSealpostFooter(!!v)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1">
+                  <label
+                    htmlFor="sealpostFooter"
+                    className="cursor-pointer text-[13px] font-medium select-none"
+                  >
+                    Add &ldquo;Sent with Sealpost&rdquo; to the emails
+                  </label>
+                  <p className="max-w-[60ch] text-[12px] leading-relaxed text-muted-foreground">
+                    Off by default. Adds one line at the bottom of each email
+                    with a link to Sealpost, so other organizers can find it.
                   </p>
                 </div>
               </div>

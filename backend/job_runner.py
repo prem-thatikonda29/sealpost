@@ -285,6 +285,7 @@ async def run_job(
                         name=name, email=email, pdf_path=pdf_path,
                         subject=event_config.get("email_subject", "Your Certificate"),
                         body=event_config.get("email_body", "Hi {name}, please find your certificate attached."),
+                        footer=bool(event_config.get("sealpost_footer", False)),
                     )
                     cap_left -= 1
                     db_row.sent_at = utc_naive_now()
