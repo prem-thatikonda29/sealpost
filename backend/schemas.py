@@ -213,8 +213,8 @@ class PreviewRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 class CleanRow(BaseModel):
-    name: str = ""
-    email: str = ""
+    name: str = Field("", max_length=2000)
+    email: str = Field("", max_length=2000)
 
 
 class CleanRequest(BaseModel):

@@ -43,6 +43,12 @@ DOMAIN_TYPOS: Dict[str, str] = {
     "icloud.con": "icloud.com",
 }
 
+# Longer than any real address (RFC 5321 caps one at 320) or name. Such cells are
+# reported, not processed, so one pathological cell cannot burn CPU in the
+# regex and unicode passes below.
+MAX_EMAIL_LENGTH = 320
+MAX_NAME_LENGTH = 500
+
 
 def _clean_text(value: Optional[str]) -> str:
     text = unicodedata.normalize("NFC", value or "").translate(_INVISIBLE)
@@ -135,11 +141,15 @@ def analyze_rows(rows: List[dict], require_email: bool = True) -> dict:
     for index, row in enumerate(rows):
         name = row.get("name") or ""
         email = row.get("email") or ""
-        clean_name = normalize_name(name)
-        clean_email = normalize_email(email)
+        name_too_long = len(name) > MAX_NAME_LENGTH
+        email_too_long = len(email) > MAX_EMAIL_LENGTH
+        clean_name = name if name_too_long else normalize_name(name)
+        clean_email = email if email_too_long else normalize_email(email)
         issues = []
 
-        if not clean_name:
+        if name_too_long:
+            issues.append(_issue("name_too_long", "error", "Name is too long"))
+        elif not clean_name:
             issues.append(_issue("missing_name", "error", "No name"))
         elif clean_name != name:
             issues.append(_issue(
@@ -147,7 +157,9 @@ def analyze_rows(rows: List[dict], require_email: bool = True) -> dict:
                 suggestion={"field": "name", "value": clean_name},
             ))
 
-        if not clean_email:
+        if email_too_long:
+            issues.append(_issue("invalid_email", "error", "Email address is too long"))
+        elif not clean_email:
             if require_email:
                 issues.append(_issue("missing_email", "error", "No email address"))
         else:

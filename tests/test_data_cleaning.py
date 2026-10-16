@@ -175,3 +175,43 @@ def test_summary_counts_mixed_rows():
     assert result["summary"] == {
         "total": 4, "errors": 1, "duplicates": 0, "typos": 1, "tidied": 1, "clean": 1,
     }
+
+
+def _codes(row):
+    return [i["code"] for i in row["issues"]]
+
+
+def test_overlong_email_is_flagged_and_not_processed():
+    raw = "a" * 309 + "@example.com"          # 321 chars
+    assert len(raw) == 321
+    out = analyze_rows([
+        {"name": "Ada", "email": raw},
+        {"name": "Bo", "email": raw},
+    ])
+    for row in out["rows"]:
+        assert row["clean_email"] == raw
+        assert _codes(row) == ["invalid_email"]
+    assert out["summary"]["errors"] == 2
+    assert out["summary"]["duplicates"] == 0
+
+
+def test_email_of_exactly_320_characters_is_processed_normally():
+    raw = "A" * 308 + "@example.com"
+    assert len(raw) == 320
+    row = analyze_rows([{"name": "Ada", "email": raw}])["rows"][0]
+    assert row["clean_email"] == raw.lower()
+    assert "invalid_email" not in _codes(row)
+    assert "email_cleaned" in _codes(row)
+
+
+def test_overlong_name_is_flagged_and_left_unchanged():
+    raw = "ada " * 125 + "x"                   # 501 chars
+    assert len(raw) == 501
+    row = analyze_rows([{"name": raw, "email": "a@example.com"}])["rows"][0]
+    assert row["clean_name"] == raw
+    assert _codes(row) == ["name_too_long"]
+
+
+def test_pathological_email_returns_and_is_invalid():
+    out = analyze_rows([{"name": "Ada", "email": "a@" + "." * 300}])
+    assert "invalid_email" in _codes(out["rows"][0])
