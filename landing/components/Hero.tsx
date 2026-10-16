@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ArrowDown, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 
 const SEAL_TEXT = "SEALPOST · CERTIFICATES FOR EVERY PARTICIPANT · ";
@@ -41,12 +42,16 @@ export default function Hero() {
   return (
     <section id="hero">
       <div className="relative w-full max-w-4xl mx-auto px-6 pt-28 md:pt-32 pb-12 md:pb-14">
-        <p
-          className="hero-in text-[11px] font-mono uppercase tracking-[0.15em] text-text-faint mb-6"
+        <Image
+          src="/brand/lockup-light.svg"
+          alt="Sealpost"
+          width={146}
+          height={30}
+          unoptimized
+          priority
+          className="hero-in hidden md:block mb-8"
           style={{ "--d": "0ms" } as React.CSSProperties}
-        >
-          Web App
-        </p>
+        />
         <h1
           className="hero-in font-serif text-5xl md:text-6xl lg:text-7xl font-normal text-text leading-[1.05] tracking-[-0.03em]"
           style={{ "--d": "80ms" } as React.CSSProperties}

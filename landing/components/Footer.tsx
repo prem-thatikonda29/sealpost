@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ArrowRight, Terminal } from "@phosphor-icons/react";
 import { useReveal } from "./useReveal";
 
@@ -40,7 +41,7 @@ export default function Footer() {
       </section>
       <footer className="border-t border-border py-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-text-faint">
-          <span className="font-medium text-text-muted">Sealpost</span>
+          <Image src="/brand/lockup-light.svg" alt="Sealpost" width={112} height={23} unoptimized />
           <div className="flex items-center gap-4">
             <a
               href="https://github.com/prem-thatikonda29/sealpost"

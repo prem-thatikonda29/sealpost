@@ -18,8 +18,19 @@ export function Nav() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
         <Link
           href="/events"
-          className="font-serif text-base tracking-[-0.02em] text-foreground shrink-0"
+          className="flex items-center gap-2 font-serif text-base tracking-[-0.02em] text-foreground shrink-0"
         >
+          <svg aria-hidden viewBox="0 0 120 120" className="h-[18px] w-[18px]">
+            <circle cx="60" cy="60" r="60" fill="#9C5A42" />
+            <path
+              d="M46.5 61 L56.3 71 L74.7 49"
+              fill="none"
+              stroke="#F5F0EB"
+              strokeWidth="7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
           Sealpost
         </Link>
 
