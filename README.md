@@ -16,6 +16,7 @@ Browser-based certificate generation and email sending tool. Upload templates, p
 - **Bundled font library**: pick from the bundled fonts or upload your own
 - **Send limits**: sends are throttled, transient SMTP errors are retried with backoff, and a run stops at your daily cap; people it didn't reach show as failed and can be re-sent tomorrow from History
 - **Duplicate protection**: an address that appears twice in one upload is only emailed once
+- **List cleaning**: before you run, review the list. Names in ALL CAPS or all lowercase are tidied (mixed-case names are left alone), stray spaces and pasted `Name <addr>` formats are fixed, and repeated addresses, invalid addresses, missing names and likely domain typos (`gmial.com`) are flagged for you to fix or remove. Tidy-ups (spacing, capitals, address format) are applied automatically and counted; anything that needs a decision is shown in the review for you to fix or remove
 
 ## Prerequisites
 
@@ -115,6 +116,7 @@ Useful for coding agents or scripted automation:
 | `POST /api/jobs` | Start a job (multipart: config JSON + CSV file) |
 | `POST /api/jobs/validate-emails` | Validate email domains before sending |
 | `POST /api/jobs/check-duplicates` | Warn about people who already have the certificate |
+| `POST /api/cleaning/analyze` | Check a participant list (tidy-ups, repeats, invalid addresses, domain typos) |
 | `GET /api/jobs` | List all past jobs |
 | `GET /api/jobs/{id}` | Get one job |
 | `GET /api/jobs/{id}/progress` | SSE stream of real-time row progress |

@@ -49,3 +49,17 @@ export function downloadCsv(text: string, filename: string): void {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * A cleaned list as the CSV the job flow expects: `name,email`. The backend
+ * re-parses the uploaded file itself, so the file has to carry the cleaned
+ * values rather than just the on-screen state.
+ */
+export function peopleCsvFile(
+  rows: { name: string; email: string }[],
+  filename: string
+): File {
+  const lines = rows.map((r) => [quote(r.name), quote(r.email)]);
+  const text = [["name", "email"], ...lines].map((line) => line.join(",")).join("\n");
+  return new File([text], filename, { type: "text/csv" });
+}
