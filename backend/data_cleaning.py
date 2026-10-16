@@ -105,11 +105,12 @@ def normalize_name(name: Optional[str]) -> str:
 def normalize_email(email: Optional[str]) -> str:
     """Strip the wrapping people paste around an address, and lower-case it."""
     text = _clean_text(email)
-    text = re.sub(r"^mailto:", "", text, flags=re.IGNORECASE)
+    if re.match(r"mailto:", text, flags=re.IGNORECASE):
+        text = re.sub(r"^mailto:", "", text, flags=re.IGNORECASE).split("?", 1)[0]
     angle = re.search(r"<([^<>]+)>", text)
     if angle:
         text = angle.group(1)
-    text = text.replace(" ", "").strip(";,<>.")
+    text = text.strip(";,<>").rstrip(".").strip()
     if len(text) >= 2 and text[0] in "\"'" and text[-1] == text[0]:
         text = text[1:-1]
     return text.lower()
@@ -171,6 +172,14 @@ def analyze_rows(rows: List[dict], require_email: bool = True) -> dict:
             ok, _reason = validate_format(clean_email)
             if not ok:
                 issues.append(_issue("invalid_email", "error", "Not a valid email address"))
+                if re.search(r"\s", clean_email):
+                    tokens = clean_email.split()
+                    joined = "".join(tokens)
+                    if len(tokens) == 2 and validate_format(joined)[0]:
+                        issues.append(_issue(
+                            "email_spaces", "warn", "Remove the space?",
+                            suggestion={"field": "email", "value": joined},
+                        ))
             else:
                 typo = suggest_domain_fix(clean_email)
                 if typo:

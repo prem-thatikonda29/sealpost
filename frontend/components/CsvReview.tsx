@@ -21,6 +21,8 @@ interface Props {
 const has = (row: CleaningRow, code: string) =>
   row.issues.some((i) => i.code === code);
 
+const MAX_RENDERED_ROWS = 500;
+
 /** Tidy-ups are applied for you and reported once; only these need a decision. */
 const problems = (row: CleaningRow) =>
   row.issues.filter((i) => i.severity !== "info");
@@ -71,7 +73,14 @@ export function CsvReview({ rows: initialRows, requireEmail: requireEmailProp, o
         if (id !== seq.current) return;
         const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data
           ?.detail;
-        setError(typeof detail === "string" ? detail : "Could not check the list");
+        const status = (e as { response?: { status?: number } })?.response?.status;
+        setError(
+          status === 422
+            ? "The list is too large or a cell is too long to check (limit: 10,000 rows, 2,000 characters per cell)."
+            : typeof detail === "string"
+              ? detail
+              : "Could not check the list"
+        );
       } finally {
         if (id === seq.current) setBusy(false);
       }
@@ -92,6 +101,7 @@ export function CsvReview({ rows: initialRows, requireEmail: requireEmailProp, o
   const found = analysis?.rows ?? [];
   const summary = analysis?.summary;
   const visible = found.filter((r) => showAll || problems(r).length > 0);
+  const shown = visible.slice(0, MAX_RENDERED_ROWS);
   const missingNames = found.filter((r) => has(r, "missing_name")).length;
 
   const removeWhere = (pred: (r: CleaningRow) => boolean) =>
@@ -231,7 +241,7 @@ export function CsvReview({ rows: initialRows, requireEmail: requireEmailProp, o
                     </td>
                   </tr>
                 )}
-                {visible.map((r) => (
+                {shown.map((r) => (
                   <tr key={r.index} className="border-b border-border last:border-0">
                     <td className="px-3 py-1.5 font-mono text-[12px] text-muted-foreground tabular">
                       {r.index + 1}
@@ -288,6 +298,13 @@ export function CsvReview({ rows: initialRows, requireEmail: requireEmailProp, o
         </div>
       )}
 
+      {visible.length > MAX_RENDERED_ROWS && (
+        <p className="text-[12px] text-muted-foreground">
+          Showing the first {MAX_RENDERED_ROWS} of {visible.length} rows. Fix or remove these and
+          re-check to see the rest.
+        </p>
+      )}
+
       {summary && (
         <div className="flex flex-wrap items-center gap-3 text-[12px] text-muted-foreground">
           <label htmlFor="csv-review-show-all" className="inline-flex items-center gap-2">
@@ -321,8 +338,12 @@ export function CsvReview({ rows: initialRows, requireEmail: requireEmailProp, o
         <Button type="button" size="sm" variant="outline" onClick={onCancel}>
           Back
         </Button>
-        {!analysis && !busy && error && (
-          <Button type="button" size="sm" onClick={() => run(initial, true)}>
+        {!busy && error && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => (analysis ? run(rows) : run(initial, true))}
+          >
             Try again
           </Button>
         )}

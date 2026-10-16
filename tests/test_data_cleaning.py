@@ -46,7 +46,10 @@ def test_normalize_name(raw, expected):
     ("mailto:ada@example.com", "ada@example.com"),
     ("Ada Lovelace <ada@example.com>", "ada@example.com"),
     ('"ada@example.com";', "ada@example.com"),
-    ("ada @example.com", "ada@example.com"),
+    ("ada @example.com", "ada @example.com"),
+    ("Ada Lovelace ada@x.com", "ada lovelace ada@x.com"),
+    (".ada@x.com", ".ada@x.com"),
+    ("mailto:a@b.com?subject=x", "a@b.com"),
     ("ada@example.com.", "ada@example.com"),
     ('"john.doe"@example.com', '"john.doe"@example.com'),
     ('"a"@x.com.', '"a"@x.com'),
@@ -215,3 +218,23 @@ def test_overlong_name_is_flagged_and_left_unchanged():
 def test_pathological_email_returns_and_is_invalid():
     out = analyze_rows([{"name": "Ada", "email": "a@" + "." * 300}])
     assert "invalid_email" in _codes(out["rows"][0])
+
+
+def test_name_and_address_run_together_is_invalid_with_no_suggestion():
+    row = analyze_rows([{"name": "Ada", "email": "Ada Lovelace ada@x.com"}])["rows"][0]
+    assert "invalid_email" in [i["code"] for i in row["issues"]]
+    # Only the harmless lower-casing is a tidy-up; no guessed recipient is offered.
+    assert not any("suggestion" in i for i in row["issues"] if i["severity"] != "info")
+    assert row["clean_email"] == "ada lovelace ada@x.com"
+
+
+def test_single_space_in_address_is_suggested_not_applied():
+    row = analyze_rows([{"name": "Ada", "email": "ada @example.com"}])["rows"][0]
+    codes_ = [i["code"] for i in row["issues"]]
+    assert "invalid_email" in codes_
+    spaces = [i for i in row["issues"] if i["code"] == "email_spaces"]
+    assert len(spaces) == 1
+    assert spaces[0]["severity"] == "warn"
+    assert spaces[0]["message"] == "Remove the space?"
+    assert spaces[0]["suggestion"] == {"field": "email", "value": "ada@example.com"}
+    assert row["clean_email"] != "ada@example.com"

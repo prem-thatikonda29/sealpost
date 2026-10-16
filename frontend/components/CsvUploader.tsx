@@ -385,9 +385,10 @@ export function CsvUploader({ onReady }: Props) {
                 type="button"
                 size="sm"
                 variant="outline"
+                title="Re-opens the original list from the file, discarding earlier removals and edits"
                 onClick={() => setReviewRows(mappedRows())}
               >
-                Review again
+                Start over
               </Button>
               <Button
                 type="button"
