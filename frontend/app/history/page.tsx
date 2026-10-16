@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useNotify } from "@/lib/notify";
+import { formatDateTime } from "@/lib/time";
 
 export default function HistoryPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -125,7 +126,7 @@ export default function HistoryPage() {
                   {job.event_name ?? "One-off job"}
                 </p>
                 <p className="mt-1 font-mono text-[12px] text-muted-foreground tabular">
-                  {new Date(job.created_at).toLocaleString()}
+                  {formatDateTime(job.created_at)}
                   {job.dry_run && (
                     <span className="ml-2 font-sans italic">dry run</span>
                   )}
