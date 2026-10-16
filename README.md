@@ -11,6 +11,7 @@ Browser-based certificate generation and email sending tool. Upload templates, p
 - **Re-send failures**: retry only the rows that missed out, with a message you can rewrite
 - **Generate all and download**: a dry run that generates every certificate, packaged up as a zip
 - **Job history**: per-row status and CSV export, plus delete a job or clear the history
+- **Delivery report**: a summary of who got their certificate and a downloadable CSV (outcome, send time in IST, attempts, and why a row failed) for every job
 - **IST by default**: all times are shown in Indian Standard Time; to change it, set both `APP_TIMEZONE` (API) and `NEXT_PUBLIC_APP_TIMEZONE` (web UI) to the same IANA zone
 - **Bundled font library**: pick from the bundled fonts or upload your own
 - **Send limits**: sends are throttled, transient SMTP errors are retried with backoff, and a run stops at your daily cap; people it didn't reach show as failed and can be re-sent tomorrow from History
@@ -118,5 +119,6 @@ Useful for coding agents or scripted automation:
 | `GET /api/jobs/{id}` | Get one job |
 | `GET /api/jobs/{id}/progress` | SSE stream of real-time row progress |
 | `GET /api/jobs/{id}/download` | Download generated certificates (zip) |
+| `GET /api/jobs/{id}/report.csv` | Download the delivery report (CSV) |
 | `DELETE /api/jobs/{id}` | Delete a job with its certificates |
 | `DELETE /api/jobs` | Clear the job history |
