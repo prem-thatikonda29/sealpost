@@ -25,3 +25,13 @@ export function formatDateTime(iso: string | null | undefined): string {
     return format(date, FALLBACK_TIMEZONE);
   }
 }
+
+/** "42s", "9 min 12s", "1 h 3 min". */
+export function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return s % 60 ? `${m} min ${s % 60}s` : `${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+}

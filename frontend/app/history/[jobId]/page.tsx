@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { getJob, deleteJob, jobDownloadUrl, type Job, type JobRow } from "@/lib/api";
+import {
+  getJob,
+  deleteJob,
+  jobDownloadUrl,
+  jobReportUrl,
+  type Job,
+  type JobRow,
+} from "@/lib/api";
+import { DeliverySummary } from "@/components/DeliverySummary";
 import { downloadCsv, rowsToRecordCsv } from "@/lib/csv";
 import { EmailText, EmailToggle } from "@/components/EmailToggle";
 import { ResendPanel } from "@/components/ResendPanel";
@@ -129,19 +137,14 @@ export default function JobDetailPage() {
                 Download .zip
               </a>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                downloadCsv(
-                  rowsToRecordCsv(rows),
-                  `job_${job.id.slice(0, 8)}_records.csv`
-                )
-              }
-              disabled={rows.length === 0}
-            >
-              Export all {rows.length}
-            </Button>
+            {rows.length > 0 && (
+              <a
+                href={jobReportUrl(job.id)}
+                className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[13px] font-medium transition-colors duration-150 hover:border-hair-hover hover:bg-surface-raised"
+              >
+                Download report
+              </a>
+            )}
             {undelivered.length > 0 && (
               <Button
                 variant="outline"
@@ -177,6 +180,8 @@ export default function JobDetailPage() {
           </div>
         }
       />
+
+      {job.summary && <DeliverySummary summary={job.summary} dryRun={job.dry_run} />}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 hairline-grid">
         {summary.map(({ label, value, tone }) => (
