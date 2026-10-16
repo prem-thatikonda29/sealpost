@@ -37,6 +37,16 @@ export default function RootLayout({
       lang="en"
       className={`${geist.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
     >
+      <head>
+        {/* Trial: Sentient (variable, upright + italic) from Fontshare. If it
+            stays, self-host it with next/font/local instead of this link. */}
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f[]=sentient@1,2&display=swap"
+        />
+      </head>
       <body className="min-h-full font-sans">
         <MobileNav />
         <Sidebar />
