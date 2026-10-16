@@ -86,6 +86,17 @@ export function CsvUploader({ onReady }: Props) {
   // How many rows the user chose to keep after cleaning, shown once they have.
   const [cleanedCount, setCleanedCount] = useState<number | null>(null);
 
+  const changeNameCol = (v: string) => {
+    setNameCol(v);
+    setCleanedCount(null);
+    setReviewRows(null);
+  };
+  const changeEmailCol = (v: string) => {
+    setEmailCol(v);
+    setCleanedCount(null);
+    setReviewRows(null);
+  };
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -205,7 +216,7 @@ export function CsvUploader({ onReady }: Props) {
             <label htmlFor="csv-name-col" className="label-mono block">
               Name column
             </label>
-            <Select value={nameCol} onValueChange={(v) => setNameCol(v ?? "")}>
+            <Select value={nameCol} onValueChange={(v) => changeNameCol(v ?? "")}>
               <SelectTrigger id="csv-name-col">
                 <SelectValue placeholder="Select column" />
               </SelectTrigger>
@@ -229,7 +240,7 @@ export function CsvUploader({ onReady }: Props) {
             </label>
             <Select
               value={emailCol || NO_EMAIL}
-              onValueChange={(v) => setEmailCol(v === NO_EMAIL ? "" : (v ?? ""))}
+              onValueChange={(v) => changeEmailCol(v === NO_EMAIL ? "" : (v ?? ""))}
             >
               <SelectTrigger id="csv-email-col">
                 <SelectValue placeholder="Select column" />
@@ -252,7 +263,7 @@ export function CsvUploader({ onReady }: Props) {
       )}
 
       {/* Validation */}
-      {emailCol && rawRows.length > 0 && (
+      {emailCol && rawRows.length > 0 && cleanedCount === null && (
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
@@ -277,6 +288,7 @@ export function CsvUploader({ onReady }: Props) {
       {/* Preview */}
       {rawRows.length > 0 && nameCol && (
         <>
+          {cleanedCount === null && (
           <div className="overflow-hidden rounded-lg border border-border">
             <div className="max-h-52 overflow-y-auto">
               <table className="w-full border-collapse">
@@ -348,8 +360,9 @@ export function CsvUploader({ onReady }: Props) {
               </table>
             </div>
           </div>
+          )}
 
-          {rawRows.length > 100 && (
+          {cleanedCount === null && rawRows.length > 100 && (
             <p className="text-[12px] text-muted-foreground">
               Showing the first 100 of {rawRows.length} rows. All of them will be
               sent.
@@ -363,6 +376,31 @@ export function CsvUploader({ onReady }: Props) {
               onUse={handleCleaned}
               onCancel={() => setReviewRows(null)}
             />
+          ) : cleanedCount !== null ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="ok">
+                Using cleaned list — {cleanedCount} of {rawRows.length} rows
+              </Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setReviewRows(mappedRows())}
+              >
+                Review again
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setCleanedCount(null);
+                  handleConfirm();
+                }}
+              >
+                Use original file
+              </Button>
+            </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -371,7 +409,7 @@ export function CsvUploader({ onReady }: Props) {
                 disabled={!nameCol}
                 onClick={() => setReviewRows(mappedRows())}
               >
-                Review & clean — {rawRows.length} rows
+                Review & clean — {mappedRows().length} rows
               </Button>
               <Button
                 type="button"
@@ -385,9 +423,6 @@ export function CsvUploader({ onReady }: Props) {
               >
                 Use as is
               </Button>
-              {cleanedCount !== null && (
-                <Badge variant="ok">Using cleaned list — {cleanedCount} rows</Badge>
-              )}
             </div>
           )}
         </>

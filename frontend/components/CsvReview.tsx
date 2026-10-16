@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { EmailText, EmailToggle } from "@/components/EmailToggle";
 import { analyzeRows, type CleaningAnalysis, type CleaningRow } from "@/lib/api";
@@ -32,8 +33,17 @@ const problems = (row: CleaningRow) =>
  * repeat, take a spelling suggestion, fix a typo by hand. Every change re-runs
  * the check, so the list on screen is always the list that was analysed.
  */
-export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Props) {
+export function CsvReview({ rows: initialRows, requireEmail: requireEmailProp, onUse, onCancel }: Props) {
+  // The review works on its own fixed copies. If the parent's props change while
+  // it is open, the user's edits must not be thrown away by a fresh first check.
+  const [initial] = useState(initialRows);
+  const [requireEmail] = useState(requireEmailProp);
   const [rows, setRows] = useState<CsvRow[]>(initial);
+  // Only the latest request may update state; a late reply is dropped.
+  const seq = useRef(0);
+  const invalidate = useCallback(() => {
+    seq.current++;
+  }, []);
   const [analysis, setAnalysis] = useState<CleaningAnalysis | null>(null);
   const [tidied, setTidied] = useState(0);
   const [busy, setBusy] = useState(true);
@@ -47,20 +57,23 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
 
   const run = useCallback(
     async (next: CsvRow[], first = false) => {
+      const id = ++seq.current;
       setBusy(true);
       setError(null);
       try {
         const result = await analyzeRows(next, requireEmail);
+        if (id !== seq.current) return;
         setAnalysis(result);
         setRows(result.rows.map((r) => ({ name: r.clean_name, email: r.clean_email })));
         if (first) setTidied(result.summary.tidied);
         setDirty(false);
       } catch (e) {
+        if (id !== seq.current) return;
         const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data
           ?.detail;
         setError(typeof detail === "string" ? detail : "Could not check the list");
       } finally {
-        setBusy(false);
+        if (id === seq.current) setBusy(false);
       }
     },
     [requireEmail]
@@ -69,8 +82,12 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
   useEffect(() => {
     // Deferred a tick so the initial check is not a synchronous setState in the effect.
     const t = setTimeout(() => run(initial, true), 0);
-    return () => clearTimeout(t);
-  }, [initial, run]);
+    return () => {
+      clearTimeout(t);
+      // Unmounting: ignore any reply still in flight.
+      invalidate();
+    };
+  }, [initial, run, invalidate]);
 
   const found = analysis?.rows ?? [];
   const summary = analysis?.summary;
@@ -99,7 +116,11 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="label-mono">Review list</p>
-        {busy && <span className="text-[12px] text-muted-foreground">Checking…</span>}
+        {busy && (
+          <span role="status" aria-live="polite" className="text-[12px] text-muted-foreground">
+            Checking…
+          </span>
+        )}
       </div>
 
       {error && (
@@ -197,7 +218,9 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
                     </span>
                   </th>
                   <th className="label-mono px-3 py-2 text-left font-medium">Issues</th>
-                  <th className="w-20" />
+                  <th className="w-20">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -216,6 +239,7 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
                     <td className="px-3 py-1.5">
                       <Input
                         aria-label={`Name, row ${r.index + 1}`}
+                        disabled={busy}
                         value={rows[r.index]?.name ?? ""}
                         onChange={(e) => setCell(r.index, "name", e.target.value)}
                       />
@@ -224,6 +248,7 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
                       {showEmails ? (
                         <Input
                           aria-label={`Email, row ${r.index + 1}`}
+                          disabled={busy}
                           value={rows[r.index]?.email ?? ""}
                           onChange={(e) => setCell(r.index, "email", e.target.value)}
                         />
@@ -249,6 +274,7 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
                         variant="ghost"
                         size="sm"
                         disabled={busy}
+                        aria-label={`Remove row ${r.index + 1}`}
                         onClick={() => run(rows.filter((_, k) => k !== r.index))}
                       >
                         Remove
@@ -264,11 +290,11 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
 
       {summary && (
         <div className="flex flex-wrap items-center gap-3 text-[12px] text-muted-foreground">
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
+          <label htmlFor="csv-review-show-all" className="inline-flex items-center gap-2">
+            <Checkbox
+              id="csv-review-show-all"
               checked={showAll}
-              onChange={(e) => setShowAll(e.target.checked)}
+              onCheckedChange={(c) => setShowAll(c === true)}
             />
             Show all {found.length} rows
           </label>
@@ -295,6 +321,11 @@ export function CsvReview({ rows: initial, requireEmail, onUse, onCancel }: Prop
         <Button type="button" size="sm" variant="outline" onClick={onCancel}>
           Back
         </Button>
+        {!analysis && !busy && error && (
+          <Button type="button" size="sm" onClick={() => run(initial, true)}>
+            Try again
+          </Button>
+        )}
       </div>
     </div>
   );
