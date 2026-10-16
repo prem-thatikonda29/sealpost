@@ -67,9 +67,15 @@ function splitNameOption(cols: string[]): string {
 
 interface Props {
   onReady: (rows: CsvRow[], file: File, mapping: CsvMapping) => void;
+  /**
+   * The list handed over through onReady no longer matches what this uploader
+   * shows (a column was changed, or a new file was picked). The parent should
+   * drop it, so a run can't start on a list the user can no longer see.
+   */
+  onCleared?: () => void;
 }
 
-export function CsvUploader({ onReady }: Props) {
+export function CsvUploader({ onReady, onCleared }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -90,11 +96,13 @@ export function CsvUploader({ onReady }: Props) {
     setNameCol(v);
     setCleanedCount(null);
     setReviewRows(null);
+    onCleared?.();
   };
   const changeEmailCol = (v: string) => {
     setEmailCol(v);
     setCleanedCount(null);
     setReviewRows(null);
+    onCleared?.();
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,6 +113,7 @@ export function CsvUploader({ onReady }: Props) {
     setShowEmails(false);
     setReviewRows(null);
     setCleanedCount(null);
+    onCleared?.();
 
     Papa.parse<Record<string, string>>(f, {
       header: true,
