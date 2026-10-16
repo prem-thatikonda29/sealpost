@@ -7,40 +7,26 @@ export default function Demo() {
   const ref = useReveal();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Play while the video is mostly on screen, pause when it leaves. Autoplay
-  // only works muted, so sound is opt-in through the controls. A viewer who
-  // pauses it themselves is left alone, and reduced-motion users get no autoplay.
+  // Start playing the first time the video is mostly on screen. Autoplay only
+  // works muted, so sound is opt-in through the controls. It is never paused
+  // or restarted for the viewer after that, so scrolling can't cut it short.
+  // Reduced-motion users get no autoplay.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    let pausedByUser = false;
-    let pausedByScroll = false;
-
-    const onPause = () => {
-      if (!pausedByScroll && !video.ended) pausedByUser = true;
-      pausedByScroll = false;
-    };
-    video.addEventListener("pause", onPause);
-
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          if (!pausedByUser) video.play().catch(() => {});
-        } else if (!video.paused) {
-          pausedByScroll = true;
-          video.pause();
-        }
+        if (!entry.isIntersecting) return;
+        observer.disconnect();
+        video.play().catch(() => {});
       },
       { threshold: 0.6 }
     );
     observer.observe(video);
 
-    return () => {
-      observer.disconnect();
-      video.removeEventListener("pause", onPause);
-    };
+    return () => observer.disconnect();
   }, []);
 
   return (
@@ -72,7 +58,7 @@ export default function Demo() {
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="auto"
             poster="/demo/sealpost-demo-poster.jpg"
             aria-label="Sealpost demo: design a certificate, check a participant list, send, and review the results"
           >
