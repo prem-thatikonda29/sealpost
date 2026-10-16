@@ -353,9 +353,13 @@ def _snapshot_name(job) -> str:
     """The event name, which is not a column: it is recorded in the snapshot."""
     if job.event_snapshot:
         try:
-            return json.loads(job.event_snapshot).get("name") or ""
+            snapshot = json.loads(job.event_snapshot)
         except ValueError:
-            pass
+            return ""
+        if isinstance(snapshot, dict):
+            name = snapshot.get("name")
+            if isinstance(name, str) and name:
+                return name
     return ""
 
 

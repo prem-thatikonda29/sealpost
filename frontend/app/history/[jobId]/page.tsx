@@ -181,7 +181,7 @@ export default function JobDetailPage() {
         }
       />
 
-      {job.summary && <DeliverySummary summary={job.summary} dryRun={job.dry_run} />}
+      {job.summary && <DeliverySummary summary={job.summary} dryRun={job.dry_run} status={job.status} />}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 hairline-grid">
         {summary.map(({ label, value, tone }) => (

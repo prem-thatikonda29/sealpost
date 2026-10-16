@@ -13,6 +13,11 @@ from backend.main import app
 from backend.models import Job, JobRow
 
 
+@pytest.fixture(autouse=True)
+def _default_timezone(monkeypatch):
+    monkeypatch.delenv("APP_TIMEZONE", raising=False)
+
+
 @pytest.fixture()
 def env(tmp_path):
     engine = create_engine(
@@ -44,6 +49,12 @@ def env(tmp_path):
         JobRow(job_id="j1", row_index=2, name="Cy", email="ada@x.com", status="skipped",
                error_message="Duplicate of row 1"),
     ])
+    for jid, snap in (("j4", [1, 2]), ("j5", {"name": 7})):
+        s.add(Job(
+            id=jid, status="done", total_rows=0, sent_count=0, failed_count=0,
+            created_at=datetime(2026, 10, 16, 12, 0),
+            event_snapshot=json.dumps(snap),
+        ))
     for jid, nm in (("j2", "हैकथॉन"), ("j3", "!!!")):
         s.add(Job(
             id=jid, status="done", total_rows=0, sent_count=0, failed_count=0,
@@ -70,6 +81,13 @@ def test_report_csv_has_one_row_per_participant_in_ist(env):
     assert table[1][5] == "2026-10-16 17:30:05 IST"
     assert table[1][6] == "2"
     assert table[3][7] == "Duplicate of row 1"
+
+
+@pytest.mark.parametrize("jid", ["j4", "j5"])
+def test_report_survives_a_malformed_snapshot(env, jid):
+    res = env.get(f"/api/jobs/{jid}/report.csv")
+    assert res.status_code == 200
+    assert 'filename="job_delivery_report_2026-10-16.csv"' in res.headers["content-disposition"]
 
 
 def test_report_for_an_unknown_job_is_404(env):

@@ -8,6 +8,11 @@ import pytest
 from backend.report import COLUMNS, build_csv, summarize
 
 
+@pytest.fixture(autouse=True)
+def _default_timezone(monkeypatch):
+    monkeypatch.delenv("APP_TIMEZONE", raising=False)
+
+
 def row(i, status, **kw):
     base = dict(row_index=i, name=f"P{i}", email=f"p{i}@x.com", status=status,
                 error_message=None, sent_at=None, attempts=0)
