@@ -56,12 +56,23 @@ def _capitalise_runs(token: str) -> str:
     return re.sub(r"[^\W\d_]+", lambda m: m.group(0).capitalize(), token)
 
 
+_TITLES = {"dr": "Dr", "mr": "Mr", "mrs": "Mrs", "ms": "Ms", "prof": "Prof"}
+
+
+def _is_initial(tok: str, bare: str) -> bool:
+    if len(bare) == 1:
+        return tok.rstrip(".") == bare
+    return len(bare) == 2 and tok == bare and bare[1] not in "AEIOUY"
+
+
 def normalize_name(name: Optional[str]) -> str:
     """Tidy a name. Only re-cases when it is ALL CAPS or all lowercase.
 
     A mixed-case name ("McDonald", "DeSouza", "Ada Lovelace") was typed on
-    purpose and is left alone. In an all-caps name, one- and two-letter words
-    stay upper-case, so initials survive ("AK SHARMA" -> "AK Sharma").
+    purpose and is left alone. In an all-caps name, initials stay upper-case: a
+    single letter with an optional dot ("A", "K."), or a two-letter word not
+    ending in a vowel ("AK", "KS"). "AK SHARMA" -> "AK Sharma", but "LI WEI" -> "Li Wei".
+    Common titles are normalised ("DR. PREM" -> "Dr. Prem").
     """
     text = _clean_text(name)
     letters = [c for c in text if c.isalpha()]
@@ -75,7 +86,10 @@ def normalize_name(name: Optional[str]) -> str:
     out = []
     for tok in tokens:
         bare = re.sub(r"[^\w]", "", tok)
-        if all_upper and len(tokens) > 1 and 0 < len(bare) <= 2:
+        title = _TITLES.get(tok.lower().rstrip("."))
+        if title:
+            out.append(title + ("." if tok.endswith(".") else ""))
+        elif all_upper and len(tokens) > 1 and _is_initial(tok, bare):
             out.append(tok)
         else:
             out.append(_capitalise_runs(tok))
@@ -89,7 +103,9 @@ def normalize_email(email: Optional[str]) -> str:
     angle = re.search(r"<([^<>]+)>", text)
     if angle:
         text = angle.group(1)
-    text = text.replace(" ", "").strip("'\"<>;,.")
+    text = text.replace(" ", "").strip(";,<>.")
+    if len(text) >= 2 and text[0] in "\"'" and text[-1] == text[0]:
+        text = text[1:-1]
     return text.lower()
 
 
