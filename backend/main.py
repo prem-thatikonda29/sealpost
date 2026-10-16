@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
 from .migrations import ensure_columns
 from .paths import FONTS_UPLOAD_DIR, OUTPUT_DIR, UPLOADS_DIR
-from .routers import events, templates, preview, jobs, fonts
+from .routers import events, templates, preview, jobs, fonts, cleaning
 
 # The dev frontend is the default. Add origins (a LAN IP for phone testing, a
 # deployed domain) without editing code, since a font served to an origin that
@@ -44,6 +44,7 @@ app.include_router(templates.router)
 app.include_router(preview.router)
 app.include_router(jobs.router)
 app.include_router(fonts.router)
+app.include_router(cleaning.router)
 
 
 @app.get("/health", tags=["health"])

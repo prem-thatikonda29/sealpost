@@ -206,3 +206,18 @@ class PreviewRequest(BaseModel):
     font_color: str = "#000000"
     max_text_width: int = 1400
     sample_name: str = "Sample Name"
+
+
+# ---------------------------------------------------------------------------
+# Upload cleaning
+# ---------------------------------------------------------------------------
+
+class CleanRow(BaseModel):
+    name: str = ""
+    email: str = ""
+
+
+class CleanRequest(BaseModel):
+    rows: List[CleanRow] = Field(max_length=10000)
+    # A generate-only run needs no addresses.
+    require_email: bool = True
