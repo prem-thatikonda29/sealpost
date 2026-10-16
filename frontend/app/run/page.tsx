@@ -114,6 +114,17 @@ function RunPageInner() {
       )
     );
 
+  // The uploader's list changed under the tier. Until a list is confirmed again
+  // the tier has nothing to run: Start stays disabled.
+  const clearCsv = (id: string) =>
+    setTiers((prev) =>
+      prev.map((t) =>
+        t.event.id === id
+          ? { ...t, csvFile: null, csvRows: null, nameCol: "name", emailCol: "email" }
+          : t
+      )
+    );
+
   const setField = (
     id: string,
     field: "emailSubject" | "emailBody",
@@ -344,6 +355,7 @@ function RunPageInner() {
                         onReady={(rows, file, mapping) =>
                           setCsv(tier.event.id, rows, file, mapping)
                         }
+                        onCleared={() => clearCsv(tier.event.id)}
                       />
 
                       <div className="space-y-4 border-t border-border pt-5">
