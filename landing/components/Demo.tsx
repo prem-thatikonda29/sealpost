@@ -7,10 +7,11 @@ export default function Demo() {
   const ref = useReveal();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Start playing the first time the video is mostly on screen. Autoplay only
-  // works muted, so sound is opt-in through the controls. It is never paused
-  // or restarted for the viewer after that, so scrolling can't cut it short.
-  // Reduced-motion users get no autoplay.
+  // Start playing the first time the video is well into view. Its top edge
+  // peeks into the hero, so scrolling toward it is what starts it. Autoplay
+  // only works muted, so sound is opt-in through the controls. It is never
+  // paused or restarted for the viewer after that, so scrolling can't cut it
+  // short. Reduced-motion users get no autoplay.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -22,7 +23,7 @@ export default function Demo() {
         observer.disconnect();
         video.play().catch(() => {});
       },
-      { threshold: 0.6 }
+      { threshold: 0.4 }
     );
     observer.observe(video);
 
@@ -30,16 +31,9 @@ export default function Demo() {
   }, []);
 
   return (
-    <section id="demo" className="pb-24 md:pb-32">
+    <section id="demo" className="pb-24 md:pb-32 scroll-mt-6">
       <div ref={ref} className="reveal max-w-4xl mx-auto px-6">
-        <h2 className="font-serif text-3xl md:text-4xl font-normal text-text tracking-[-0.02em]">
-          See it run
-        </h2>
-        <p className="mt-3 text-text-muted max-w-[50ch] leading-relaxed">
-          A full run in under a minute: design the certificate, load and check
-          a list, then watch every send land.
-        </p>
-        <figure className="mt-10 bg-surface border border-border overflow-hidden shadow-[6px_6px_0_0_var(--color-accent-terra)] transition-colors duration-150 hover:border-border-hover">
+        <figure className="bg-surface border border-border overflow-hidden shadow-[6px_6px_0_0_var(--color-accent-terra)] transition-colors duration-150 hover:border-border-hover">
           <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-surface-raised">
             <div className="flex gap-1.5" aria-hidden="true">
               <span className="w-2.5 h-2.5 rounded-full bg-border-hover" />
