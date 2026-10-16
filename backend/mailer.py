@@ -22,7 +22,7 @@ IMAP_PORT = 993
 
 # Appended to the body when the organizer opts in. Plain text, and added after
 # the body's {name} substitution so it can never be mistaken for a placeholder.
-FOOTER = "\n\n--\nSent with Sealpost: https://github.com/prem-thatikonda29/sealpost"
+FOOTER = "\n\n--\nSent with Sealpost: https://sealpost.vercel.app"
 
 # Extract all email addresses from a block of text
 _EMAIL_RE = re.compile(r"[\w.\-+]+@[\w.\-]+\.\w+")

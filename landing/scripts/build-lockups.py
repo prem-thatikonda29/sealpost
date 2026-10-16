@@ -10,7 +10,7 @@ variable TTFs and point this script at them:
     python3 landing/scripts/build-lockups.py --fonts /path/to/sentient
 
 The folder needs Sentient-Variable.ttf and Sentient-VariableItalic.ttf.
-Run landing/scripts/build-brand.py first is not required; the two are independent.
+The two scripts are independent; run either one on its own.
 Needs `rsvg-convert` (brew install librsvg) and fontTools for the PNG and outlines.
 """
 import argparse
@@ -112,7 +112,7 @@ def svg_doc(inner: str, bounds, label="Sealpost", pad=2):
     )
 
 
-def build_og(roman: Face, italic: Face, out_png: Path) -> None:
+def build_og(roman: Face, medium: Face, italic: Face, out_png: Path) -> None:
     W, H, LEFT = 1200, 630, 72
     parts = [f'<rect width="{W}" height="{H}" fill="{CANVAS}"/>']
 
@@ -140,11 +140,10 @@ def build_og(roman: Face, italic: Face, out_png: Path) -> None:
     )
 
     # Supporting line and address.
-    body = Face_path_cache["roman400"]
     for i, text in enumerate(["Place names. Upload a list.", "Watch every send land."]):
-        d, _, _ = body.set(text, 28, LEFT, 498 + i * 38)
+        d, _, _ = roman.set(text, 28, LEFT, 498 + i * 38)
         parts.append(f'<path d="{d}" fill="{MUTED}"/>')
-    d, _, _ = Face_path_cache["roman500"].set("sealpost.vercel.app", 24, LEFT, 584, tracking=0.01)
+    d, _, _ = medium.set("sealpost.vercel.app", 24, LEFT, 584, tracking=0.01)
     parts.append(f'<path d="{d}" fill="{TERRA}"/>')
 
     # Certificate card, tilted, with the flat terracotta offset the site uses.
@@ -178,9 +177,6 @@ def build_og(roman: Face, italic: Face, out_png: Path) -> None:
         subprocess.run(["rsvg-convert", "-o", str(out_png), str(src)], check=True)
 
 
-Face_path_cache: dict = {}
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fonts", required=True, type=Path, help="folder with the two Sentient variable TTFs")
@@ -188,20 +184,19 @@ def main() -> None:
     roman_path = args.fonts / "Sentient-Variable.ttf"
     italic_path = args.fonts / "Sentient-VariableItalic.ttf"
 
-    logo = Face(roman_path, 500)
-    Face_path_cache["roman400"] = Face(roman_path, 400)
-    Face_path_cache["roman500"] = logo
+    regular = Face(roman_path, 400)
+    logo = Face(roman_path, 500)  # the weight the logo is drawn in
     BRAND.mkdir(parents=True, exist_ok=True)
 
     for theme, fill in (("light", INK), ("dark", CANVAS)):
-        inner, b, _ = (lambda r: (r[0], r[1], r[2]))(wordmark(logo, 100, 0, 0, fill))
+        inner, b, _ = wordmark(logo, 100, 0, 0, fill)
         (BRAND / f"wordmark-{theme}.svg").write_text(svg_doc(inner, b))
 
     for theme in ("light", "dark", "mono-ink", "mono-cream"):
         inner, b = lockup(logo, theme)
         (BRAND / f"lockup-{theme}.svg").write_text(svg_doc(inner, b))
 
-    build_og(Face(roman_path, 400), Face(italic_path, 400), BRAND / "og-image.png")
+    build_og(regular, logo, Face(italic_path, 400), BRAND / "og-image.png")
     print("wrote wordmarks, lockups and og-image.png")
 
 

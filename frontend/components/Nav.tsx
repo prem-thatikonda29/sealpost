@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -20,17 +21,7 @@ export function Nav() {
           href="/events"
           className="flex items-center gap-2 font-serif text-base tracking-[-0.02em] text-foreground shrink-0"
         >
-          <svg aria-hidden viewBox="0 0 120 120" className="h-[18px] w-[18px]">
-            <circle cx="60" cy="60" r="60" fill="#9C5A42" />
-            <path
-              d="M46.5 61 L56.3 71 L74.7 49"
-              fill="none"
-              stroke="#F5F0EB"
-              strokeWidth="7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Image src="/brand/mark-light.svg" alt="" width={18} height={18} unoptimized />
           Sealpost
         </Link>
 

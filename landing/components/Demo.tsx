@@ -52,7 +52,7 @@ export default function Demo() {
             muted
             loop
             playsInline
-            preload="auto"
+            preload="metadata"
             poster="/demo/sealpost-demo-poster.jpg"
             aria-label="Sealpost demo: design a certificate, check a participant list, send, and review the results"
           >

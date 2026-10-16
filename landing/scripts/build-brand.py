@@ -70,9 +70,7 @@ FAVICON = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="
 APP_ICON = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Sealpost">
   <rect width="512" height="512" fill="{CANVAS}"/>
   <g transform="translate(106 106) scale(2.5)">
-    <circle cx="60" cy="60" r="60" fill="{TERRA}"/>
-    <circle cx="60" cy="60" r="49" fill="none" stroke="{CANVAS}" stroke-width="1.4" stroke-opacity="0.5"/>
-    <path d="M46.5 61 L56.3 71 L74.7 49" fill="none" stroke="{CANVAS}" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+    {mark_group(TERRA, CANVAS)}
   </g>
 </svg>
 """
@@ -123,6 +121,11 @@ def main() -> None:
             png(BRAND / "favicon.svg", p, size)
             frames.append(p)
         ico(frames, BRAND / "favicon.ico")
+
+    # The app's nav loads the mark from its own public folder.
+    app_brand = ROOT / "frontend" / "public" / "brand"
+    app_brand.mkdir(parents=True, exist_ok=True)
+    shutil.copy(BRAND / "mark-light.svg", app_brand / "mark-light.svg")
 
     # Next picks these up by filename: app/icon.svg, app/favicon.ico, app/apple-icon.png.
     for app_dir in (ROOT / "landing" / "app", ROOT / "frontend" / "app"):

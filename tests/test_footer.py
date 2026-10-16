@@ -45,10 +45,26 @@ class TestMailer:
     def test_footer_is_added_when_asked(self, tmp_path, monkeypatch):
         text = send(tmp_path, monkeypatch, footer=True)
         assert text.startswith("Hi Priyanka,\n\nHere you go.")
-        assert text.endswith("Sent with Sealpost: https://github.com/prem-thatikonda29/sealpost")
+        assert text.endswith("Sent with Sealpost: https://sealpost.vercel.app")
 
-    def test_a_brace_in_the_body_is_still_a_placeholder_not_the_footer(self):
-        # The footer goes on after substitution, so it is never run through format().
+    def test_braces_in_a_name_survive_the_footer(self, tmp_path, monkeypatch):
+        # The footer is added after the name is substituted, so nothing in the
+        # message is run through format() twice.
+        monkeypatch.setenv("GMAIL_USER", "org@gmail.com")
+        monkeypatch.setenv("GMAIL_APP_PASSWORD", "x")
+        pdf = tmp_path / "x.pdf"
+        pdf.write_bytes(b"%PDF-1.4")
+        smtp = FakeSMTP()
+        mailer.send_certificate(
+            smtp=smtp, name="{oops}", email="x@x.com", pdf_path=str(pdf),
+            subject="Hi", body="Hi {name}.", footer=True,
+        )
+        text = body_of(smtp.messages[0])
+        assert text.startswith("Hi {oops}.")
+        assert text.endswith("Sent with Sealpost: https://sealpost.vercel.app")
+
+    def test_the_footer_text_is_literal(self):
+        # It is appended, never formatted, but a brace here would still be a trap.
         assert "{" not in mailer.FOOTER and "}" not in mailer.FOOTER
 
 
