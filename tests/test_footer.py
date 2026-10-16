@@ -82,3 +82,37 @@ class TestRunner:
     def test_opting_in_reaches_every_email(self, env):  # noqa: F811
         run_with(env, sealpost_footer=True)
         assert [kw["footer"] for kw in env.sent] == [True, True]
+
+
+class TestApi:
+    """The choice is recorded on the job, which is what a re-send reads back."""
+
+    def post(self, env, **extra):  # noqa: F811
+        import json
+
+        # env yields the TestClient from test_generate_only's fixture.
+        config = {
+            "event_config": {
+                "name": "E",
+                "template_path": env.template,
+                "text_position_x": 200,
+                "text_position_y": 140,
+                "font_size": 48,
+                "max_text_width": 350,
+            },
+            "dry_run": True,
+            **extra,
+        }
+        res = env.post(
+            "/api/jobs",
+            data={"config": json.dumps(config)},
+            files={"csv_file": ("p.csv", "name,email\nPriyanka Rao,p@x.com\n", "text/csv")},
+        )
+        assert res.status_code == 201, res.text
+        return env.get(f"/api/jobs/{res.json()['job_id']}").json()["event_snapshot"]
+
+    def test_the_snapshot_records_an_opt_in(self, env):  # noqa: F811
+        assert self.post(env, sealpost_footer=True)["sealpost_footer"] is True
+
+    def test_the_snapshot_records_the_default_as_off(self, env):  # noqa: F811
+        assert self.post(env)["sealpost_footer"] is False
