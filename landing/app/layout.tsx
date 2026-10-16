@@ -24,7 +24,7 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
   title: "Sealpost - Hackathon Certificates in Minutes",
   description:
-    "A Python CLI tool that generates personalized PDF certificates and emails them to participants.",
+    "A web app that generates personalized PDF certificates and emails them to participants, with list cleaning, send limits, and a delivery report.",
 };
 
 export default function RootLayout({

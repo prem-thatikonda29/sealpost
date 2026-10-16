@@ -6,7 +6,10 @@ import {
   ArrowClockwise,
   PaintBrush,
   ChartBarHorizontal,
-  ShieldCheck,
+  Broom,
+  SealCheck,
+  Gauge,
+  FileCsv,
 } from "@phosphor-icons/react";
 import { useReveal } from "./useReveal";
 
@@ -14,14 +17,48 @@ const features = [
   {
     icon: Lightning,
     title: "Batch Generation",
-    description: "Generate hundreds of certificates from a CSV in seconds",
+    description:
+      "Make hundreds of certificates from a single spreadsheet",
     color: "bg-accent-terra",
     textColor: "text-accent-terra-text",
   },
   {
     icon: EnvelopeSimple,
     title: "Email Delivery",
-    description: "Send personalized certificates directly via Gmail SMTP",
+    description:
+      "Send each certificate straight from your own Gmail",
+    color: "bg-accent-sage",
+    textColor: "text-accent-sage-text",
+  },
+  {
+    icon: Broom,
+    title: "List Cleaning",
+    description:
+      "Fixes ALL CAPS names and stray spaces for you, and points out repeats, missing names and wrong email addresses before you send",
+    color: "bg-accent-amber",
+    textColor: "text-accent-amber-text",
+  },
+  {
+    icon: SealCheck,
+    title: "Address Checks",
+    description:
+      "Spots typos like gmial.com before anything goes out, and warns you before sending to someone who already has theirs",
+    color: "bg-accent-rose",
+    textColor: "text-accent-rose-text",
+  },
+  {
+    icon: Gauge,
+    title: "Safe Sending",
+    description:
+      "Emails go out at a steady pace to stay within Gmail's limits. If you reach the daily limit, the run stops and you finish tomorrow",
+    color: "bg-accent-terra",
+    textColor: "text-accent-terra-text",
+  },
+  {
+    icon: FileCsv,
+    title: "Delivery Report",
+    description:
+      "See who got their certificate and who didn't, and why. Download it all as a spreadsheet",
     color: "bg-accent-sage",
     textColor: "text-accent-sage-text",
   },
@@ -29,31 +66,25 @@ const features = [
     icon: ArrowClockwise,
     title: "Re-send Failures",
     description:
-      "Retry only the rows that missed out, with a message you can rewrite",
+      "Retry only the people who missed out, with a message you can rewrite",
     color: "bg-accent-amber",
     textColor: "text-accent-amber-text",
   },
   {
     icon: PaintBrush,
     title: "Custom Templates",
-    description: "Multiple tiers with unique templates for winners, runners-up, and participants",
-    color: "bg-accent-terra",
-    textColor: "text-accent-terra-text",
+    description:
+      "A different design for winners, runners-up and participants, with a library of fonts or your own",
+    color: "bg-accent-rose",
+    textColor: "text-accent-rose-text",
   },
   {
     icon: ChartBarHorizontal,
     title: "Generate & Download",
     description:
-      "Generate every certificate and download the zip without sending a single email",
-    color: "bg-accent-sage",
-    textColor: "text-accent-sage-text",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Rate Control",
-    description: "Configurable batch sizes to respect SMTP rate limits",
-    color: "bg-accent-rose",
-    textColor: "text-accent-rose-text",
+      "Make every certificate and download them as a zip, without sending a single email",
+    color: "bg-accent-terra",
+    textColor: "text-accent-terra-text",
   },
 ];
 

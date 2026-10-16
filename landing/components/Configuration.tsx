@@ -6,8 +6,8 @@ import { useReveal } from "./useReveal";
 const places = [
   {
     where: ".env",
-    what: "Gmail credentials: GMAIL_USER and GMAIL_APP_PASSWORD",
-    detail: "The only credentials you need to send",
+    what: "Gmail credentials, plus optional send limits and timezone",
+    detail: "GMAIL_USER and GMAIL_APP_PASSWORD are the only required values",
   },
   {
     where: "Event",
@@ -75,6 +75,22 @@ export default function Configuration() {
           </h3>
           <CodeBlock
             code={`GMAIL_USER=your-email@gmail.com\nGMAIL_APP_PASSWORD=your-16-char-app-password`}
+            label=".env"
+          />
+        </div>
+        <div className="mt-10">
+          <h3 className="text-sm font-semibold text-text mb-3">
+            Send limits and timezone
+          </h3>
+          <p className="text-[13px] text-text-muted mb-3 max-w-[60ch] leading-relaxed">
+            All optional. The defaults keep a big run inside Gmail&apos;s limits.
+            When the daily cap is reached the run stops, and the people it
+            didn&apos;t reach show as failed so you can re-send tomorrow from
+            History. Times show in IST; to change that, set both timezone
+            values to the same IANA zone.
+          </p>
+          <CodeBlock
+            code={`# seconds between emails\nSEND_INTERVAL_SECONDS=1.0\n# stop before Gmail's own cap (about 500 per rolling 24h)\nSEND_DAILY_CAP=450\n# retries for dropped connections and 4xx replies\nSEND_MAX_RETRIES=3\nSEND_BACKOFF_BASE_SECONDS=2.0\n\n# timezone for every time shown or exported\nAPP_TIMEZONE=Asia/Kolkata\nNEXT_PUBLIC_APP_TIMEZONE=Asia/Kolkata`}
             label=".env"
           />
         </div>
