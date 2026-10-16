@@ -7,11 +7,13 @@ import csv
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 import zipfile
 from datetime import datetime
 from typing import List, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -371,11 +373,17 @@ def delivery_report(job_id: str, db: Session = Depends(get_db)):
     rows = db.query(JobRow).filter(JobRow.job_id == job_id).all()
     stamp = to_app_tz(job.created_at).strftime("%Y-%m-%d")
     base = cert_engine.sanitize_name(_snapshot_name(job)) or "job"
+    full_name = f"{base}_delivery_report_{stamp}.csv"
+    ascii_base = re.sub(r"[^A-Za-z0-9_]", "", base) or "job"
+    ascii_name = f"{ascii_base}_delivery_report_{stamp}.csv"
     return Response(
         report.build_csv(rows).encode("utf-8"),
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f'attachment; filename="{base}_delivery_report_{stamp}.csv"'
+            "Content-Disposition": (
+                f'attachment; filename="{ascii_name}"; '
+                f"filename*=UTF-8''{quote(full_name)}"
+            )
         },
     )
 

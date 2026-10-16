@@ -44,10 +44,15 @@ def env(tmp_path):
         JobRow(job_id="j1", row_index=2, name="Cy", email="ada@x.com", status="skipped",
                error_message="Duplicate of row 1"),
     ])
+    for jid, nm in (("j2", "हैकथॉन"), ("j3", "!!!")):
+        s.add(Job(
+            id=jid, status="done", total_rows=0, sent_count=0, failed_count=0,
+            created_at=datetime(2026, 10, 16, 12, 0),
+            event_snapshot=json.dumps({"name": nm}),
+        ))
     s.commit()
     s.close()
-    with TestClient(app) as c:
-        yield c
+    yield TestClient(app)
     app.dependency_overrides.clear()
 
 
@@ -90,3 +95,20 @@ def test_the_zip_download_still_names_itself_from_the_event(env, tmp_path, monke
     res = env.get("/api/jobs/j1/download")
     assert res.status_code == 200
     assert "hack_night.zip" in res.headers["content-disposition"]
+
+
+def test_report_csv_survives_a_non_latin_event_name(env):
+    res = env.get("/api/jobs/j2/report.csv")
+    assert res.status_code == 200
+    cd = res.headers["content-disposition"]
+    cd.encode("latin-1")
+    assert '_delivery_report_2026-10-16.csv"' in cd
+    assert 'filename="' in cd and all(ord(ch) < 128 for ch in cd)
+    assert "filename*=UTF-8''" in cd
+    assert "%E0%A4%B9" in cd
+
+
+def test_report_csv_symbol_only_name_falls_back_to_ascii(env):
+    res = env.get("/api/jobs/j3/report.csv")
+    assert res.status_code == 200
+    assert 'filename="job_delivery_report_2026-10-16.csv"' in res.headers["content-disposition"]
