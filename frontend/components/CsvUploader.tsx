@@ -90,17 +90,18 @@ export function CsvUploader({ onReady, onCleared }: Props) {
   // Non-null while the review step is open: the rows it was opened with.
   const [reviewRows, setReviewRows] = useState<CsvRow[] | null>(null);
   // How many rows the user chose to keep after cleaning, shown once they have.
-  const [cleanedCount, setCleanedCount] = useState<number | null>(null);
+  const [cleanedRows, setCleanedRows] = useState<CsvRow[] | null>(null);
+  const cleanedCount = cleanedRows ? cleanedRows.length : null;
 
   const changeNameCol = (v: string) => {
     setNameCol(v);
-    setCleanedCount(null);
+    setCleanedRows(null);
     setReviewRows(null);
     onCleared?.();
   };
   const changeEmailCol = (v: string) => {
     setEmailCol(v);
-    setCleanedCount(null);
+    setCleanedRows(null);
     setReviewRows(null);
     onCleared?.();
   };
@@ -112,7 +113,7 @@ export function CsvUploader({ onReady, onCleared }: Props) {
     setValidation({});
     setShowEmails(false);
     setReviewRows(null);
-    setCleanedCount(null);
+    setCleanedRows(null);
     onCleared?.();
 
     Papa.parse<Record<string, string>>(f, {
@@ -180,7 +181,7 @@ export function CsvUploader({ onReady, onCleared }: Props) {
   const handleCleaned = (rows: CsvRow[]) => {
     if (!file) return;
     setReviewRows(null);
-    setCleanedCount(rows.length);
+    setCleanedRows(rows);
     onReady(rows, peopleCsvFile(rows, file.name.replace(/\.csv$/i, "") + "-cleaned.csv"), {
       nameCol: "name",
       emailCol: emailCol ? "email" : "",
@@ -378,6 +379,65 @@ export function CsvUploader({ onReady, onCleared }: Props) {
             </p>
           )}
 
+          {cleanedRows !== null && !reviewRows && (
+            <div className="space-y-2">
+              <p className="text-[12px] text-muted-foreground">
+                This is the list that will be used. It started as{" "}
+                {mappedRows().length} rows; {mappedRows().length - cleanedRows.length}{" "}
+                removed during review, and tidied names and addresses are shown as
+                they will be sent.
+              </p>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="max-h-52 overflow-y-auto">
+                  <table className="w-full border-collapse">
+                    <thead className="sticky top-0 bg-muted">
+                      <tr className="border-b border-border">
+                        <th className="label-mono w-10 px-3 py-2 text-left font-medium">
+                          #
+                        </th>
+                        <th className="label-mono px-3 py-2 text-left font-medium">
+                          Name
+                        </th>
+                        {emailCol && (
+                          <th className="label-mono px-3 py-2 text-left font-medium">
+                            <span className="inline-flex items-center gap-2">
+                              Email
+                              <EmailToggle
+                                shown={showEmails}
+                                onToggle={() => setShowEmails((s) => !s)}
+                              />
+                            </span>
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cleanedRows.slice(0, 100).map((row, i) => (
+                        <tr key={i} className="border-b border-border last:border-0">
+                          <td className="px-3 py-1.5 font-mono text-[12px] text-muted-foreground tabular">
+                            {i + 1}
+                          </td>
+                          <td className="px-3 py-1.5 text-[13px]">{row.name}</td>
+                          {emailCol && (
+                            <td className="px-3 py-1.5 font-mono text-[12px]">
+                              <EmailText email={row.email} shown={showEmails} />
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {cleanedRows.length > 100 && (
+                <p className="text-[12px] text-muted-foreground">
+                  Showing the first 100 of {cleanedRows.length} rows. All of them will
+                  be sent.
+                </p>
+              )}
+            </div>
+          )}
+
           {reviewRows ? (
             <CsvReview
               rows={reviewRows}
@@ -404,7 +464,7 @@ export function CsvUploader({ onReady, onCleared }: Props) {
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  setCleanedCount(null);
+                  setCleanedRows(null);
                   handleConfirm();
                 }}
               >
@@ -427,7 +487,7 @@ export function CsvUploader({ onReady, onCleared }: Props) {
                 variant="outline"
                 disabled={!nameCol}
                 onClick={() => {
-                  setCleanedCount(null);
+                  setCleanedRows(null);
                   handleConfirm();
                 }}
               >
