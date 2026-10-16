@@ -34,6 +34,21 @@ export interface JobRow {
   sent_at?: string;
 }
 
+export interface JobSummary {
+  total: number;
+  delivered: number;
+  generated: number;
+  failed: number;
+  bounced: number;
+  invalid: number;
+  skipped: number;
+  not_processed: number;
+  retries: number;
+  duration_seconds: number | null;
+  /** Null for a generate-only job, or one where nothing was attempted. */
+  delivered_pct: number | null;
+}
+
 export interface Job {
   id: string;
   event_id?: string;
@@ -48,6 +63,7 @@ export interface Job {
   created_at: string;
   finished_at?: string;
   rows?: JobRow[];
+  summary?: JobSummary;
   /** Whether this job left certificates on disk worth offering as a zip. */
   certificates_available?: boolean;
   /**
@@ -226,6 +242,9 @@ export const clearJobs = () => api.delete("/api/jobs");
  * hand back to the browser would only lose all of that.
  */
 export const jobDownloadUrl = (id: string) => `${BASE}/api/jobs/${id}/download`;
+
+/** The delivery report. A plain link for the same reason as the zip: the browser downloads it. */
+export const jobReportUrl = (id: string) => `${BASE}/api/jobs/${id}/report.csv`;
 
 export const validateEmails = (emails: string[]) =>
   api

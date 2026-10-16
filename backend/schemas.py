@@ -73,6 +73,21 @@ class JobCreate(BaseModel):
     email_body: str = "Hi {name},\n\nPlease find your certificate attached.\n\nBest regards"
 
 
+class JobSummary(BaseModel):
+    """Counts and timings for the delivery report card."""
+    total: int
+    delivered: int
+    generated: int
+    failed: int
+    bounced: int
+    invalid: int
+    skipped: int
+    not_processed: int
+    retries: int
+    duration_seconds: Optional[int] = None
+    delivered_pct: Optional[float] = None
+
+
 class JobResponse(BaseModel):
     id: str
     event_id: Optional[str]
@@ -92,6 +107,8 @@ class JobResponse(BaseModel):
     # rebuild it without needing the event to still exist — and so the original
     # message can prefill the retry's subject and body.
     event_snapshot: Optional[dict] = None
+    # Filled in by get_job from the rows; not a column.
+    summary: Optional[JobSummary] = None
 
     @field_validator("event_snapshot", mode="before")
     @classmethod

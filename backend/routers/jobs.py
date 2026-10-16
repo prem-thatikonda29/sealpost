@@ -7,14 +7,16 @@ import csv
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 import zipfile
 from datetime import datetime
 from typing import List, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
@@ -29,13 +31,15 @@ from ..schemas import (
     DuplicateRecipient,
     JobCreate,
     JobResponse,
+    JobSummary,
     JobListItem,
     JobRowResponse,
     EmailValidationResult,
 )
 from .. import cert_engine
 from ..cert_engine import validate_inputs
-from .. import job_runner
+from .. import job_runner, report
+from ..timeutil import to_app_tz
 from ..email_validator import validate_format, validate_mx
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -345,6 +349,49 @@ async def job_progress(job_id: str, db: Session = Depends(get_db)):
 # Downloading the certificates a job produced
 # ---------------------------------------------------------------------------
 
+def _snapshot_name(job) -> str:
+    """The event name, which is not a column: it is recorded in the snapshot."""
+    if job.event_snapshot:
+        try:
+            snapshot = json.loads(job.event_snapshot)
+        except ValueError:
+            return ""
+        if isinstance(snapshot, dict):
+            name = snapshot.get("name")
+            if isinstance(name, str) and name:
+                return name
+    return ""
+
+
+@router.get("/{job_id}/report.csv")
+def delivery_report(job_id: str, db: Session = Depends(get_db)):
+    """
+    Who was sent what, who bounced, who failed: one row per participant.
+
+    Times are in the app timezone (IST by default). The BOM lets Excel read
+    names that are not ASCII.
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    rows = db.query(JobRow).filter(JobRow.job_id == job_id).all()
+    stamp = to_app_tz(job.created_at).strftime("%Y-%m-%d")
+    base = cert_engine.sanitize_name(_snapshot_name(job)) or "job"
+    full_name = f"{base}_delivery_report_{stamp}.csv"
+    ascii_base = re.sub(r"[^A-Za-z0-9_]", "", base) or "job"
+    ascii_name = f"{ascii_base}_delivery_report_{stamp}.csv"
+    return Response(
+        report.build_csv(rows).encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{ascii_name}"; '
+                f"filename*=UTF-8''{quote(full_name)}"
+            )
+        },
+    )
+
+
 @router.get("/{job_id}/download")
 def download_certificates(job_id: str, db: Session = Depends(get_db)):
     """
@@ -365,14 +412,7 @@ def download_certificates(job_id: str, db: Session = Depends(get_db)):
             detail="This job has no certificates on disk. They are removed if the job is deleted.",
         )
 
-    # The name is not a column — it is recorded in the snapshot, the same way
-    # list_jobs reads it.
-    name = "certificates"
-    if job.event_snapshot:
-        try:
-            name = json.loads(job.event_snapshot).get("name") or name
-        except ValueError:
-            pass
+    name = _snapshot_name(job) or "certificates"
 
     # Stored, not deflated: the PDFs are mostly JPEG, which is already
     # compressed, so deflating spends CPU to save almost nothing.
@@ -511,4 +551,5 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     # 404 for a job that rendered nothing.
     response = JobResponse.model_validate(job)
     response.certificates_available = _has_certificates(job_id)
+    response.summary = JobSummary(**report.summarize(job, job.rows))
     return response
