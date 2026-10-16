@@ -267,3 +267,47 @@ export const checkDuplicates = (eventId: string | null | undefined, emails: stri
       emails,
     })
     .then((r) => r.data);
+
+export interface CleaningIssue {
+  code: string;
+  severity: "error" | "warn" | "info";
+  message: string;
+  suggestion?: { field: "name" | "email"; value: string };
+  duplicate_of?: number;
+}
+
+export interface CleaningRow {
+  index: number;
+  name: string;
+  email: string;
+  /** The value with the safe tidy-ups applied. */
+  clean_name: string;
+  clean_email: string;
+  issues: CleaningIssue[];
+}
+
+export interface CleaningSummary {
+  total: number;
+  errors: number;
+  duplicates: number;
+  typos: number;
+  tidied: number;
+  clean: number;
+}
+
+export interface CleaningAnalysis {
+  rows: CleaningRow[];
+  summary: CleaningSummary;
+}
+
+/** Check a participant list before it is generated or sent. Nothing is stored. */
+export const analyzeRows = (
+  rows: { name: string; email: string }[],
+  requireEmail: boolean
+) =>
+  api
+    .post<CleaningAnalysis>("/api/cleaning/analyze", {
+      rows,
+      require_email: requireEmail,
+    })
+    .then((r) => r.data);

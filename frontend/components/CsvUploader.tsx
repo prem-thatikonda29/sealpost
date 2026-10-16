@@ -12,7 +12,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmailText, EmailToggle } from "@/components/EmailToggle";
+import { CsvReview } from "@/components/CsvReview";
 import { validateEmails, type EmailValidation } from "@/lib/api";
+import { peopleCsvFile } from "@/lib/csv";
 
 export interface CsvRow {
   name: string;
@@ -79,6 +81,10 @@ export function CsvUploader({ onReady }: Props) {
   // Addresses are personal data and this table is often on a shared screen, so
   // they stay hidden until the user asks. Reset on each upload.
   const [showEmails, setShowEmails] = useState(false);
+  // Non-null while the review step is open: the rows it was opened with.
+  const [reviewRows, setReviewRows] = useState<CsvRow[] | null>(null);
+  // How many rows the user chose to keep after cleaning, shown once they have.
+  const [cleanedCount, setCleanedCount] = useState<number | null>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -86,6 +92,8 @@ export function CsvUploader({ onReady }: Props) {
     setFile(f);
     setValidation({});
     setShowEmails(false);
+    setReviewRows(null);
+    setCleanedCount(null);
 
     Papa.parse<Record<string, string>>(f, {
       header: true,
@@ -133,17 +141,30 @@ export function CsvUploader({ onReady }: Props) {
     }
   };
 
-  const handleConfirm = () => {
-    // A name is the only thing a certificate needs. The address is what makes
-    // it *sendable*, and that is the run's problem, not the file's.
-    if (!file || !nameCol) return;
-    const rows: CsvRow[] = rawRows
+  const mappedRows = (): CsvRow[] =>
+    rawRows
       .map((r) => ({
         name: rowName(r, nameCol),
         email: emailCol ? (r[emailCol]?.trim() ?? "") : "",
       }))
       .filter((r) => r.name || r.email);
+
+  const handleConfirm = () => {
+    // A name is the only thing a certificate needs. The address is what makes
+    // it *sendable*, and that is the run's problem, not the file's.
+    if (!file || !nameCol) return;
+    const rows = mappedRows();
     onReady(rows, file, { nameCol, emailCol });
+  };
+
+  const handleCleaned = (rows: CsvRow[]) => {
+    if (!file) return;
+    setReviewRows(null);
+    setCleanedCount(rows.length);
+    onReady(rows, peopleCsvFile(rows, file.name.replace(/\.csv$/i, "") + "-cleaned.csv"), {
+      nameCol: "name",
+      emailCol: emailCol ? "email" : "",
+    });
   };
 
   const invalidCount = Object.values(validation).filter((v) => !v.valid).length;
@@ -335,9 +356,40 @@ export function CsvUploader({ onReady }: Props) {
             </p>
           )}
 
-          <Button type="button" size="sm" disabled={!nameCol} onClick={handleConfirm}>
-            Use this CSV — {rawRows.length} rows
-          </Button>
+          {reviewRows ? (
+            <CsvReview
+              rows={reviewRows}
+              requireEmail={Boolean(emailCol)}
+              onUse={handleCleaned}
+              onCancel={() => setReviewRows(null)}
+            />
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={!nameCol}
+                onClick={() => setReviewRows(mappedRows())}
+              >
+                Review & clean — {rawRows.length} rows
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!nameCol}
+                onClick={() => {
+                  setCleanedCount(null);
+                  handleConfirm();
+                }}
+              >
+                Use as is
+              </Button>
+              {cleanedCount !== null && (
+                <Badge variant="ok">Using cleaned list — {cleanedCount} rows</Badge>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
