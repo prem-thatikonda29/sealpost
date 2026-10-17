@@ -14,10 +14,36 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
 });
 
+const title = "Sealpost - Hackathon Certificates in Minutes";
+// Kept under ~125 characters so social previews don't truncate it.
+const description =
+  "Generate personalized PDF certificates and email them to participants, with list cleaning, send limits and a delivery report.";
+const ogImage = {
+  url: "/brand/og-image.png",
+  width: 1200,
+  height: 630,
+  alt: "Sealpost - Hackathon Certificates in Minutes",
+};
+
 export const metadata: Metadata = {
-  title: "Sealpost - Hackathon Certificates in Minutes",
-  description:
-    "A web app that generates personalized PDF certificates and emails them to participants, with list cleaning, send limits, and a delivery report.",
+  // Social cards need absolute image URLs; this resolves the relative ones.
+  metadataBase: new URL("https://sealpost.vercel.app"),
+  title,
+  description,
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Sealpost",
+    title,
+    description,
+    images: [ogImage],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: [ogImage],
+  },
 };
 
 export default function RootLayout({
