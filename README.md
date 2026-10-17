@@ -17,6 +17,7 @@ Browser-based certificate generation and email sending tool. Upload templates, p
 - **Send limits**: sends are throttled, transient SMTP errors are retried with backoff, and a run stops at your daily cap; people it didn't reach show as failed and can be re-sent tomorrow from History
 - **Duplicate protection**: an address that appears twice in one upload is only emailed once
 - **List cleaning**: before you run, review the list. Names in ALL CAPS or all lowercase are tidied (mixed-case names are left alone), stray spaces and pasted `Name <addr>` formats are fixed, and repeated addresses, invalid addresses, missing names and likely domain typos (`gmial.com`) are flagged for you to fix or remove. Tidy-ups (spacing, capitals, address format) are applied automatically and counted; anything that needs a decision is shown in the review for you to fix or remove
+- **Optional footer**: a "Sent with Sealpost" line at the bottom of each email, off by default; tick it under Run options, and a re-send keeps your choice
 
 ## Prerequisites
 

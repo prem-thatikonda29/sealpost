@@ -77,12 +77,13 @@ export function ResendPanel({
       // The certificate comes from the frozen snapshot, so a re-send produces
       // the same one everyone else received. The message is yours to rewrite —
       // an apology reads differently from the original invitation.
-      const { email_subject, email_body, ...certificate } = snapshot;
+      const { email_subject, email_body, sealpost_footer, ...certificate } = snapshot;
       const { job_id } = await createJob(
         {
           event_config: certificate,
           email_subject: subject,
           email_body: body,
+          sealpost_footer: !!sealpost_footer,
           name_col: "name",
           email_col: "email",
         },

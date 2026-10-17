@@ -62,6 +62,7 @@ function RunPageInner() {
   const [tiers, setTiers] = useState<TierSetup[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [dryRun, setDryRun] = useState(false);
+  const [sealpostFooter, setSealpostFooter] = useState(false);
   const [batchSize, setBatchSize] = useState(0);
   const [runningJobs, setRunningJobs] = useState<TierJob[] | null>(null);
   const [starting, setStarting] = useState(false);
@@ -197,6 +198,8 @@ function RunPageInner() {
         event_id: tier.event.id,
         email_subject: tier.emailSubject,
         email_body: tier.emailBody,
+        // Nothing is emailed in a generate-only run, so there is no footer to add.
+        sealpost_footer: sealpostFooter && !dryRun,
         dry_run: dryRun,
         batch_size: batchSize,
         // The columns the user actually picked. Hardcoding "name"/"email" meant
@@ -439,6 +442,29 @@ function RunPageInner() {
                   </p>
                 </div>
               </div>
+
+              {!dryRun && (
+                <div className="flex items-start gap-2.5">
+                  <Checkbox
+                    id="sealpostFooter"
+                    checked={sealpostFooter}
+                    onCheckedChange={(v) => setSealpostFooter(!!v)}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="sealpostFooter"
+                      className="cursor-pointer text-[13px] font-medium select-none"
+                    >
+                      Add &ldquo;Sent with Sealpost&rdquo; to the emails
+                    </label>
+                    <p className="max-w-[60ch] text-[12px] leading-relaxed text-muted-foreground">
+                      Off by default. Adds one line at the bottom of each email
+                      with a link to Sealpost, so other organizers can find it.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label htmlFor="batchSize" className="label-mono block">

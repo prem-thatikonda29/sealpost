@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Newsreader } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import "./globals.css";
@@ -15,16 +14,10 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
 });
 
-const newsreader = Newsreader({
-  subsets: ["latin"],
-  variable: "--font-newsreader",
-  style: ["normal", "italic"],
-});
-
 export const metadata: Metadata = {
   title: "Sealpost - Hackathon Certificates in Minutes",
   description:
-    "A Python CLI tool that generates personalized PDF certificates and emails them to participants.",
+    "A web app that generates personalized PDF certificates and emails them to participants, with list cleaning, send limits, and a delivery report.",
 };
 
 export default function RootLayout({
@@ -35,8 +28,19 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
+      className={`${geist.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Sentient (variable, upright + italic), delivered by Fontshare's API.
+            Its licence (ITF FFL) forbids putting the font files in a public
+            repository, so this stays an API link rather than a bundled file. */}
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f[]=sentient@1,2&display=swap"
+        />
+      </head>
       <body className="min-h-full font-sans">
         <MobileNav />
         <Sidebar />

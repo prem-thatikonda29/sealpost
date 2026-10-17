@@ -21,7 +21,7 @@
 
   --font-sans: var(--font-geist);
   --font-mono: var(--font-geist-mono);
-  --font-serif: "Newsreader", "Playfair Display", Georgia, serif;
+  --font-serif: "Sentient", Georgia, serif;
 }
 
 html {
@@ -58,5 +58,54 @@ body {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
+  }
+}
+
+/* Hero: staggered load-in, a hand-drawn underline, and a seal that stamps in
+   once and then turns slowly. Every element is fully visible by default and the
+   keyframes only supply the starting state, so if animations never run (a
+   frozen capture, an extension that disables them) nothing is left hidden.
+   All of it is switched off for reduced motion. */
+.hero-in {
+  animation: hero-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms) backwards;
+}
+
+.draw-underline {
+  stroke-dasharray: 1;
+  animation: draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.7s backwards;
+}
+
+.seal-stamp {
+  transform: rotate(-6deg);
+  animation: stamp 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) 0.9s backwards;
+}
+
+.seal-ring {
+  transform-origin: 100px 100px;
+  animation: spin 48s linear infinite;
+}
+
+@keyframes hero-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes draw {
+  from { stroke-dashoffset: 1; }
+}
+
+@keyframes stamp {
+  from { opacity: 0; transform: scale(1.25) rotate(-14deg); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-in,
+  .seal-stamp,
+  .draw-underline,
+  .seal-ring {
+    animation: none;
   }
 }

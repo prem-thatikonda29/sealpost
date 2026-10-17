@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Sealpost">
+  <rect width="512" height="512" fill="#F5F0EB"/>
+  <g transform="translate(106 106) scale(2.5)">
+    <circle cx="60" cy="60" r="60" fill="#9C5A42"/>
+  <circle cx="60" cy="60" r="49" fill="none" stroke="#F5F0EB" stroke-width="1.4" stroke-opacity="0.5"/>
+  <path d="M46.5 61 L56.3 71 L74.7 49" fill="none" stroke="#F5F0EB" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

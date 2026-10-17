@@ -20,6 +20,10 @@ SMTP_PORT = 587
 IMAP_HOST = "imap.gmail.com"
 IMAP_PORT = 993
 
+# Appended to the body when the organizer opts in. Plain text, and added after
+# the body's {name} substitution so it can never be mistaken for a placeholder.
+FOOTER = "\n\n--\nSent with Sealpost: https://sealpost.vercel.app"
+
 # Extract all email addresses from a block of text
 _EMAIL_RE = re.compile(r"[\w.\-+]+@[\w.\-]+\.\w+")
 
@@ -51,10 +55,12 @@ def send_certificate(
     pdf_path: str,
     subject: str,
     body: str,
+    footer: bool = False,
 ) -> None:
     """
     Send a certificate PDF to `email`.
     `body` may contain {name} which is substituted with the first name.
+    `footer` appends the "Sent with Sealpost" line.
     Raises smtplib.SMTPException on failure.
     """
     from .cert_engine import get_first_name
@@ -66,7 +72,10 @@ def send_certificate(
     msg["From"] = user
     msg["To"] = email
     msg["Subject"] = subject
-    msg.attach(MIMEText(body.format(name=first), "plain"))
+    text = body.format(name=first)
+    if footer:
+        text += FOOTER
+    msg.attach(MIMEText(text, "plain"))
 
     with open(pdf_path, "rb") as fh:
         att = MIMEApplication(fh.read(), _subtype="pdf")

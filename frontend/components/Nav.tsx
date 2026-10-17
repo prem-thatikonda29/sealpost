@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -18,8 +19,9 @@ export function Nav() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
         <Link
           href="/events"
-          className="font-serif text-base tracking-[-0.02em] text-foreground shrink-0"
+          className="flex items-center gap-2 font-serif text-base tracking-[-0.02em] text-foreground shrink-0"
         >
+          <Image src="/brand/mark-light.svg" alt="" width={18} height={18} unoptimized />
           Sealpost
         </Link>
 
