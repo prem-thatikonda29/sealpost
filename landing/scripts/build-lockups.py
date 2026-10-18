@@ -124,7 +124,7 @@ def build_og(roman: Face, medium: Face, italic: Face, out_png: Path) -> None:
     # Headline.
     size = 78
     lines = [("Send hackathon", roman, INK), ("certificates", roman, INK)]
-    y = 236
+    y = 220
     for text, face, fill in lines:
         d, _, adv = face.set(text, size, LEFT, y, tracking=-0.02)
         assert adv < 590, f"headline line too wide: {adv}"
@@ -139,11 +139,30 @@ def build_og(roman: Face, medium: Face, italic: Face, out_png: Path) -> None:
         f'stroke-width="4" stroke-linecap="round"/>'
     )
 
-    # Supporting line and address.
+    # Supporting line.
     for i, text in enumerate(["Place names. Upload a list.", "Watch every send land."]):
-        d, _, _ = roman.set(text, 28, LEFT, 498 + i * 38)
+        d, _, _ = roman.set(text, 28, LEFT, 476 + i * 38)
         parts.append(f'<path d="{d}" fill="{MUTED}"/>')
-    d, _, _ = medium.set("sealpost.vercel.app", 24, LEFT, 584, tracking=0.01)
+
+    # Call to action: the site's dark "Get started" button, the address beside it.
+    bx, by, bh, pad_x, label_size = LEFT, 540, 56, 26, 24
+    base = by + bh / 2 + medium.cap_height(label_size) / 2
+    d, _, label_w = medium.set("Get started", label_size, bx + pad_x, base)
+    ax = bx + pad_x + label_w + 14  # arrow, drawn as strokes
+    ay = by + bh / 2
+    bw = ax + 18 + pad_x - bx
+    parts.append(f'<rect x="{bx}" y="{by}" width="{num(bw)}" height="{bh}" rx="4" fill="{INK}"/>')
+    parts.append(f'<path d="{d}" fill="{CANVAS}"/>')
+    parts.append(
+        f'<path d="M{num(ax)} {num(ay)} H{num(ax + 18)} M{num(ax + 11)} {num(ay - 7)} '
+        f'L{num(ax + 18)} {num(ay)} L{num(ax + 11)} {num(ay + 7)}" fill="none" stroke="{CANVAS}" '
+        f'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    )
+    url_size = 22
+    d, _, url_w = medium.set(
+        "sealpost.vercel.app", url_size, bx + bw + 24, by + bh / 2 + medium.cap_height(url_size) / 2, tracking=0.01
+    )
+    assert bx + bw + 24 + url_w < 610, "call to action runs into the certificate"
     parts.append(f'<path d="{d}" fill="{TERRA}"/>')
 
     # Certificate card, tilted, with the flat terracotta offset the site uses.
