@@ -33,10 +33,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased min-h-screen`}
-      >
+    // The font variables live on <html>: globals.css applies `font-sans` there,
+    // and a variable defined on <body> is invisible to its parent.
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable}`}
+    >
+      <body className="antialiased min-h-screen">
         {/* Mounted at the root so any screen can report an outcome, and so a
             toast outlives the navigation a save triggers. */}
         <Toaster>
