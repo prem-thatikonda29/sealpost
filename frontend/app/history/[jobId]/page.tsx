@@ -18,7 +18,7 @@ import { ResendPanel } from "@/components/ResendPanel";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useNotify } from "@/lib/notify";
 import { formatDateTime } from "@/lib/time";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -64,7 +64,7 @@ export default function JobDetailPage() {
       <div className="space-y-6">
         <Link
           href="/history"
-          className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-block rounded-sm text-[13px] text-muted-foreground transition-colors hover:text-foreground hover:underline underline-offset-4"
         >
           ← History
         </Link>
@@ -119,7 +119,7 @@ export default function JobDetailPage() {
     <div className="space-y-6">
       <Link
         href="/history"
-        className="inline-block text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-block rounded-sm text-[13px] text-muted-foreground transition-colors hover:text-foreground hover:underline underline-offset-4"
       >
         ← History
       </Link>
@@ -132,7 +132,7 @@ export default function JobDetailPage() {
             {job.certificates_available && (
               <a
                 href={jobDownloadUrl(job.id)}
-                className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[13px] font-medium transition-colors duration-150 hover:border-hair-hover hover:bg-surface-raised"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
               >
                 Download .zip
               </a>
@@ -140,7 +140,7 @@ export default function JobDetailPage() {
             {rows.length > 0 && (
               <a
                 href={jobReportUrl(job.id)}
-                className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[13px] font-medium transition-colors duration-150 hover:border-hair-hover hover:bg-surface-raised"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
               >
                 Download report
               </a>

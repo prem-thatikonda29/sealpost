@@ -304,15 +304,15 @@ export function CsvUploader({ onReady, onCleared }: Props) {
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 bg-muted">
                   <tr className="border-b border-border">
-                    <th className="label-mono w-10 px-3 py-2 text-left font-medium">
+                    <th scope="col" className="label-mono w-10 px-3 py-2 text-left font-medium">
                       #
                     </th>
-                    <th className="label-mono px-3 py-2 text-left font-medium">
+                    <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                       Name
                     </th>
                     {emailCol && (
                       <>
-                        <th className="label-mono px-3 py-2 text-left font-medium">
+                        <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                           <span className="inline-flex items-center gap-2">
                             Email
                             <EmailToggle
@@ -321,7 +321,7 @@ export function CsvUploader({ onReady, onCleared }: Props) {
                             />
                           </span>
                         </th>
-                        <th className="label-mono px-3 py-2 text-left font-medium">
+                        <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                           Domain
                         </th>
                       </>
@@ -392,14 +392,14 @@ export function CsvUploader({ onReady, onCleared }: Props) {
                   <table className="w-full border-collapse">
                     <thead className="sticky top-0 bg-muted">
                       <tr className="border-b border-border">
-                        <th className="label-mono w-10 px-3 py-2 text-left font-medium">
+                        <th scope="col" className="label-mono w-10 px-3 py-2 text-left font-medium">
                           #
                         </th>
-                        <th className="label-mono px-3 py-2 text-left font-medium">
+                        <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                           Name
                         </th>
                         {emailCol && (
-                          <th className="label-mono px-3 py-2 text-left font-medium">
+                          <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                             <span className="inline-flex items-center gap-2">
                               Email
                               <EmailToggle

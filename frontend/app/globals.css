@@ -132,6 +132,33 @@
     text-wrap: pretty;
   }
 
+  /* Tailwind v4 resets buttons to the default arrow. Anything clickable should
+     say so; disabled controls say they are unavailable. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="checkbox"],
+  [role="combobox"],
+  [role="option"],
+  summary,
+  label[for],
+  select,
+  input[type="checkbox"],
+  input[type="file"],
+  input[type="color"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"],
+  input:disabled {
+    cursor: not-allowed;
+  }
+
+  /* A visible keyboard focus for anything that doesn't draw its own. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
   ::selection {
     background-color: var(--color-terra);
     color: var(--color-terra-ink);
@@ -165,6 +192,25 @@
 
   .hairline-grid > * {
     background-color: var(--card);
+  }
+
+  /* Appears only when focused by keyboard: jumps past the nav to the page. */
+  .skip-link {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 100;
+    transform: translateY(-200%);
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: var(--primary-foreground);
+    padding: 0.5rem 0.875rem;
+    font-size: 13px;
+    font-weight: 500;
+    transition: transform 150ms;
+  }
+  .skip-link:focus {
+    transform: translateY(0);
   }
 
   /* Long-form prose measure. */

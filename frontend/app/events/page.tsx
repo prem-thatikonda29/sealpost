@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import { getEvents, deleteEvent, type Event } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
@@ -50,8 +50,8 @@ export default function EventsPage() {
         title="Events"
         subtitle="Saved certificate configurations"
         actions={
-          <Link href="/events/new">
-            <Button>+ New Event</Button>
+          <Link href="/events/new" className={buttonVariants()}>
+            + New Event
           </Link>
         }
       />
@@ -78,8 +78,8 @@ export default function EventsPage() {
             name on it. Create one per award tier — winners, runners-up,
             participants — then reuse it for every batch you send.
           </p>
-          <Link href="/events/new" className="mt-5 inline-block">
-            <Button>Create your first event</Button>
+          <Link href="/events/new" className={`mt-5 ${buttonVariants()}`}>
+            Create your first event
           </Link>
         </div>
       )}
@@ -128,15 +128,17 @@ export default function EventsPage() {
               </dl>
 
               <div className="mt-auto flex items-center gap-2 pt-1">
-                <Link href={`/events/${ev.id}`}>
-                  <Button variant="outline" size="sm">
-                    Edit
-                  </Button>
+                <Link
+                  href={`/events/${ev.id}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Edit
                 </Link>
-                <Link href={`/run?event=${ev.id}`}>
-                  <Button variant="outline" size="sm">
-                    Run →
-                  </Button>
+                <Link
+                  href={`/run?event=${ev.id}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Run →
                 </Link>
                 <ConfirmDialog
                   triggerClassName="ml-auto text-destructive hover:bg-rose hover:text-rose-ink"

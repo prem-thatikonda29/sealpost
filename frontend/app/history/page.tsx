@@ -106,7 +106,7 @@ export default function HistoryPage() {
           </p>
           <Link
             href="/run"
-            className="mt-5 inline-block text-[13px] font-medium text-terra-ink underline underline-offset-4"
+            className="mt-5 inline-block rounded-sm text-[13px] font-medium text-terra-ink underline underline-offset-4 hover:text-primary"
           >
             Go to Run
           </Link>
@@ -119,7 +119,7 @@ export default function HistoryPage() {
             <Link
               key={job.id}
               href={`/history/${job.id}`}
-              className="flex items-center justify-between gap-4 p-4 transition-colors duration-150 hover:bg-surface-raised"
+              className="flex items-center justify-between gap-4 p-4 transition-colors duration-150 hover:bg-surface-raised focus-visible:bg-surface-raised focus-visible:outline-offset-[-2px]"
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-foreground">

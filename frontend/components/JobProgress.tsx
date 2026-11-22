@@ -129,12 +129,14 @@ export function JobProgress({
       {/* Progress */}
       <div className="space-y-2">
         <div className="flex items-baseline justify-between gap-4">
-          <span className="text-[13px]">{statusLabel}</span>
+          <span role="status" aria-live="polite" className="text-[13px]">
+            {statusLabel}
+          </span>
           <span className="font-mono text-[12px] text-muted-foreground tabular">
             {phase === "done" ? total : processed} / {total} · {phase === "done" ? 100 : pct}%
           </span>
         </div>
-        <Progress value={phase === "done" ? 100 : pct} />
+        <Progress value={phase === "done" ? 100 : pct} aria-label="Job progress" />
       </div>
 
       {phase === "done" && doneActions && <div>{doneActions}</div>}
@@ -171,13 +173,13 @@ export function JobProgress({
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-muted">
                 <tr className="border-b border-border">
-                  <th className="label-mono w-10 px-3 py-2 text-left font-medium">
+                  <th scope="col" className="label-mono w-10 px-3 py-2 text-left font-medium">
                     #
                   </th>
-                  <th className="label-mono px-3 py-2 text-left font-medium">
+                  <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                     Name
                   </th>
-                  <th className="label-mono px-3 py-2 text-left font-medium">
+                  <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                     <span className="inline-flex items-center gap-2">
                       Email
                       <EmailToggle
@@ -186,10 +188,10 @@ export function JobProgress({
                       />
                     </span>
                   </th>
-                  <th className="label-mono px-3 py-2 text-left font-medium">
+                  <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                     Status
                   </th>
-                  <th className="label-mono px-3 py-2 text-left font-medium">
+                  <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                     Note
                   </th>
                 </tr>
