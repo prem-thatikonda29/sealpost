@@ -14,7 +14,8 @@ import { CsvUploader, type CsvMapping, type CsvRow } from "@/components/CsvUploa
 import { EmailText, EmailToggle } from "@/components/EmailToggle";
 import { JobProgress } from "@/components/JobProgress";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -253,7 +254,7 @@ function RunPageInner() {
                     dryRun ? (
                       <a
                         href={jobDownloadUrl(job.jobId)}
-                        className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[13px] font-medium transition-colors duration-150 hover:border-hair-hover hover:bg-surface-raised"
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
                       >
                         Download {job.total} certificates (.zip)
                       </a>
@@ -296,9 +297,9 @@ function RunPageInner() {
             template and the name placement. Create one, then come back here to
             attach a participant CSV.
           </p>
-          <a href="/events/new" className="mt-5 inline-block">
-            <Button>Create an event</Button>
-          </a>
+          <Link href="/events/new" className={`mt-5 ${buttonVariants()}`}>
+            Create an event
+          </Link>
         </div>
       ) : (
         <>
@@ -344,12 +345,12 @@ function RunPageInner() {
                         <p className="rounded-md bg-amber px-3 py-2 text-[13px] leading-relaxed text-amber-ink">
                           This event is missing a template or a name position.
                           It will fail when the job runs —{" "}
-                          <a
+                          <Link
                             href={`/events/${tier.event.id}`}
-                            className="underline underline-offset-2"
+                            className="rounded-sm underline underline-offset-2 hover:text-foreground"
                           >
                             fix it in the editor
-                          </a>
+                          </Link>
                           .
                         </p>
                       )}

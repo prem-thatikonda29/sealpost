@@ -216,9 +216,9 @@ export function CsvReview({ rows: initialRows, requireEmail: requireEmailProp, o
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-muted">
                 <tr className="border-b border-border">
-                  <th className="label-mono w-10 px-3 py-2 text-left font-medium">#</th>
-                  <th className="label-mono px-3 py-2 text-left font-medium">Name</th>
-                  <th className="label-mono px-3 py-2 text-left font-medium">
+                  <th scope="col" className="label-mono w-10 px-3 py-2 text-left font-medium">#</th>
+                  <th scope="col" className="label-mono px-3 py-2 text-left font-medium">Name</th>
+                  <th scope="col" className="label-mono px-3 py-2 text-left font-medium">
                     <span className="inline-flex items-center gap-2">
                       Email
                       <EmailToggle
@@ -227,7 +227,7 @@ export function CsvReview({ rows: initialRows, requireEmail: requireEmailProp, o
                       />
                     </span>
                   </th>
-                  <th className="label-mono px-3 py-2 text-left font-medium">Issues</th>
+                  <th scope="col" className="label-mono px-3 py-2 text-left font-medium">Issues</th>
                   <th className="w-20">
                     <span className="sr-only">Actions</span>
                   </th>

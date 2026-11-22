@@ -19,7 +19,7 @@ export function Nav() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
         <Link
           href="/events"
-          className="flex items-center gap-2 font-serif text-base tracking-[-0.02em] text-foreground shrink-0"
+          className="flex items-center gap-2 rounded-sm font-serif text-base tracking-[-0.02em] text-foreground shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
         >
           <Image src="/brand/mark-light.svg" alt="" width={18} height={18} unoptimized />
           Sealpost
@@ -34,7 +34,7 @@ export function Nav() {
                 href={l.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative px-2.5 py-1.5 text-[13px] transition-colors duration-150",
+                  "relative rounded-sm px-2.5 py-1.5 text-[13px] transition-colors duration-150 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
                   active
                     ? "text-foreground font-medium"
                     : "text-muted-foreground hover:text-foreground"

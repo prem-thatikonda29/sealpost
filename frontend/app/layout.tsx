@@ -23,7 +23,10 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "Sealpost",
+  title: {
+    default: "Sealpost",
+    template: "%s · Sealpost",
+  },
   description: "Certificate generation and email sending",
 };
 
@@ -42,9 +45,18 @@ export default function RootLayout({
       <body className="antialiased min-h-screen">
         {/* Mounted at the root so any screen can report an outcome, and so a
             toast outlives the navigation a save triggers. */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
         <Toaster>
           <Nav />
-          <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</main>
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="max-w-5xl mx-auto px-4 sm:px-6 py-8 outline-none"
+          >
+            {children}
+          </main>
         </Toaster>
       </body>
     </html>
