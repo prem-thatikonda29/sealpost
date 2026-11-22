@@ -7,3 +7,4 @@ python-dotenv
 aiofiles
 sse-starlette
 dnspython
+python-multipart
